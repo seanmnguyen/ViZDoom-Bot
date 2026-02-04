@@ -24,6 +24,7 @@ from basic_dqn import DQNAgent as DQNAgent_Basic
 # The main configurations for this demo:
 save_model = True
 load_model = True
+visible_window = True
 # Configuration file path
 config_file_path = os.path.join(vzd.scenarios_path, "defend_the_line.cfg")
 
@@ -57,27 +58,32 @@ else:
 # ---------- DRIVER ----------
 if __name__ == "__main__":
     # Get Model Type, set model_savefile, and Agent
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         print("Command line argument expected: <model_type>")
         print("Options: 'basic', 'late_fusion")
-        return
+        exit()
     model_type = sys.argv[1]
-    match(model_type):
-        case "basic":
-            model_savefile = "../models/basic_dqn.pth"
-            AgentBuilder = DQNAgent_Basic
-            break
-        case "late_fusion":
-            model_savefile = "../models/late_fusion.pth"
-            AgentBuilder = DQNAgent_LateFusion
-        default:
-            print(f"Unexpected model type: {model_type}")
-            return
+    if model_type == "basic_dqn":
+        AgentBuilder = DQNAgent_Basic
+    elif model_type == "late_fusion":
+        AgentBuilder = DQNAgent_LateFusion
+    else:
+        print(f"Unexpected model type: {model_type}")
+        exit()
+    model_savefile = f"../models/{model_type}.pth"
+
+    if len(sys.argv) == 3:
+        if sys.argv[2] == "True":
+            visible_window = False
+        elif sys.argv[2] == "False":
+            visible_window = False
+        else:
+            print("Invalid visible window argument. Expected 'True' or 'False'")
 
     # Initialize game and actions with window visible
     game = vzd.DoomGame()
     game.load_config(config_file_path)
-    game.set_window_visible(True)
+    game.set_window_visible(visible_window)
     game.set_mode(vzd.Mode.ASYNC_PLAYER)
     game.set_screen_format(vzd.ScreenFormat.GRAY8)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
@@ -108,8 +114,6 @@ if __name__ == "__main__":
             assert game_state is not None
             state_img = preprocess(game_state.screen_buffer, resolution)
             state_vars = preprocess_vars(game_state.game_variables, len(game.get_available_game_variables()))
-            # best_action_index = agent.get_action(state_img, state_vars)
-            best_action_index = agent.get_action(state_img)
             best_action_index = agent.get_action(state_img, state_vars)
 
             game.set_action(actions[best_action_index])
@@ -117,7 +121,8 @@ if __name__ == "__main__":
                 game.advance_action()
 
         # Sleep between episodes
-        sleep(1.0)
+        if visible_window:
+            sleep(1.0)
         score = game.get_total_reward()
         total_score += score
         print(f"Episode {episode_num + 1} Total Score: {score}")

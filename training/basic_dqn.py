@@ -229,8 +229,8 @@ class DQNAgent:
         self.criterion = nn.MSELoss()
 
         if load_model:
-            if model_weights is not None:  # weights inputted
-                model_savefile = model_weights
+            # if model_weights is not None:  # weights inputted
+            #     model_savefile = model_weights
             print("Loading model from: ", model_savefile)
             sd = torch.load(model_savefile, map_location=DEVICE)
 
@@ -251,7 +251,7 @@ class DQNAgent:
 
         self.opt = optim.SGD(self.q_net.parameters(), lr=self.lr)
 
-    def get_action(self, state, state_vars):
+    def get_action(self, state, state_vars=None):
         if np.random.uniform() < self.epsilon:
             return random.choice(range(self.action_size))
         else:
