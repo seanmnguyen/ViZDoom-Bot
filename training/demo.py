@@ -45,7 +45,7 @@ test_episodes_per_epoch = 100
 # Other parameters
 frame_repeat = 12
 resolution = (30, 45)
-episodes_to_watch = 10
+episodes_to_watch = 5
 
 # Uses GPU if available
 if torch.cuda.is_available():
@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
     # Play episode with model
     total_score = 0
-    for _ in range(episodes_to_watch):
+    for episode_num in range(episodes_to_watch):
         game.new_episode()
         while not game.is_episode_finished():
             game_state = game.get_state()
@@ -97,5 +97,5 @@ if __name__ == "__main__":
         sleep(1.0)
         score = game.get_total_reward()
         total_score += score
-        print("Total score: ", score)
-    print(f"-----Final score: {total_score / episodes_to_watch}-----")
+        print(f"Episode {episode_num + 1} Total Score: {score}")
+    print(f"-----Average Score: {total_score / episodes_to_watch}-----")
