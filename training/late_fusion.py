@@ -336,6 +336,7 @@ class DQNAgent:
         epsilon=1,
         epsilon_decay=0.9996,
         epsilon_min=0.1,
+        model_weights=None
     ):
         self.action_size = action_size
         self.epsilon = epsilon
@@ -348,6 +349,10 @@ class DQNAgent:
         self.criterion = nn.MSELoss()
 
         if load_model:
+            if model_weights is not None:  # weights inputted
+                global model_savefile
+                model_savefile = model_weights
+            print("Loading Late Fusion model from:", model_savefile)
             sd = torch.load(model_savefile, map_location=DEVICE)  # now this is a dict
 
             # TODO: may need to refactor to be compatible with FiLMDuelQNet

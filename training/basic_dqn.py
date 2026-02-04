@@ -229,9 +229,10 @@ class DQNAgent:
         self.criterion = nn.MSELoss()
 
         if load_model:
-            # if model_weights is not None:  # weights inputted
-            #     model_savefile = model_weights
-            print("Loading model from: ", model_savefile)
+            if model_weights is not None:  # weights inputted
+                global model_savefile
+                model_savefile = model_weights
+            print("Loading Basic DQN model from:", model_savefile)
             sd = torch.load(model_savefile, map_location=DEVICE)
 
             self.q_net = DuelQNet(action_size).to(DEVICE)

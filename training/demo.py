@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
     if len(sys.argv) == 3:
         if sys.argv[2] == "True":
-            visible_window = False
+            visible_window = True
         elif sys.argv[2] == "False":
             visible_window = False
         else:
@@ -103,6 +103,7 @@ if __name__ == "__main__":
         memory_size=replay_memory_size,
         discount_factor=discount_factor,
         load_model=load_model,
+        model_weights=model_savefile,
     )
 
     # Play episode with model
