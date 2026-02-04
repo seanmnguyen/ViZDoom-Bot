@@ -14,7 +14,7 @@ import torch.optim as optim
 from tqdm import trange
 
 import vizdoom as vzd
-
+from utils import *
 
 # Q-learning settings
 learning_rate = 0.00025
@@ -56,32 +56,6 @@ GAME_VARS = [
 NUM_VARS = len(GAME_VARS)
 ARCH = "late_fusion"  # or "film"
 
-def preprocess_vars(v: np.ndarray) -> np.ndarray:
-    """
-    v: game_state.game_variables (shape: [NUM_VARS])
-    returns float32 vector shape (NUM_VARS,)
-    """
-    v = np.asarray(v, dtype=np.float32)
-    # safety sizing
-    if v.shape[0] != NUM_VARS:
-        out = np.zeros((NUM_VARS,), dtype=np.float32)
-        out[: min(NUM_VARS, v.shape[0])] = v[: min(NUM_VARS, v.shape[0])]
-        v = out
-
-    health, ammo = v[0], v[1]
-
-    health = np.clip(health, 0.0, 100.0) / 100.0
-    ammo   = np.clip(ammo,   0.0, 50.0)  / 50.0
-
-    return np.array([health, ammo], dtype=np.float32)
-
-def preprocess(img):
-    """Down samples image to resolution"""
-    img = skimage.transform.resize(img, resolution)
-    img = img.astype(np.float32)
-    img = np.expand_dims(img, axis=0)
-    return img
-
 
 def create_simple_game():
     print("Initializing doom...")
@@ -107,8 +81,8 @@ def test(game, agent):
         game.new_episode()
         while not game.is_episode_finished():
             game_state = game.get_state()
-            state_img = preprocess(game_state.screen_buffer)
-            state_vars = preprocess_vars(game_state.game_variables)
+            state_img = preprocess(game_state.screen_buffer, resolution)
+            state_vars = preprocess_vars(game_state.game_variables, NUM_VARS)
             best_action_index = agent.get_action(state_img, state_vars)
 
             game.make_action(actions[best_action_index], frame_repeat)
@@ -141,10 +115,8 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
 
         for _ in trange(steps_per_epoch, leave=False):
             game_state = game.get_state()
-            state_img = preprocess(game_state.screen_buffer)
-            state_vars = preprocess_vars(game_state.game_variables)
-            # print("vars:", state_vars, "shape:", state_vars.shape)
-            # print(game_state.game_variables)
+            state_img = preprocess(game_state.screen_buffer, resolution)
+            state_vars = preprocess_vars(game_state.game_variables, NUM_VARS)
 
             action = agent.get_action(state_img, state_vars)
             reward = game.make_action(actions[action], frame_repeat)
@@ -152,8 +124,8 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
 
             if not done:
                 next_game_state = game.get_state()
-                next_img = preprocess(next_game_state.screen_buffer)
-                next_vars = preprocess_vars(next_game_state.game_variables)
+                next_img = preprocess(next_game_state.screen_buffer, resolution)
+                next_vars = preprocess_vars(next_game_state.game_variables, NUM_VARS)
             else:
                 next_img = np.zeros((1, 30, 45), dtype=np.float32)
                 next_vars = np.zeros((NUM_VARS,), dtype=np.float32)
@@ -385,12 +357,6 @@ class DQNAgent:
             self.target_net.eval()
             self.epsilon = 0.0
 
-        # if load_model:
-        #     print("Loading model from: ", model_savefile)
-        #     self.q_net = torch.load(model_savefile).to(DEVICE)
-        #     self.target_net = torch.load(model_savefile)
-        #     self.epsilon = self.epsilon_min
-
         else:
             print("Initializing new model")
             if ARCH == "late_fusion":
@@ -472,11 +438,8 @@ class DQNAgent:
 if __name__ == "__main__":
     # Initialize game and actions
     game = create_simple_game()
-    # n = game.get_available_buttons_size()
-    n = 3
+    n = game.get_available_buttons_size()
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
-    print("ACTIONS:", actions)
-    print("BUTTONS:", game.get_available_buttons())
 
     # Initialize our agent with the set parameters
     agent = DQNAgent(
@@ -487,9 +450,6 @@ if __name__ == "__main__":
         discount_factor=discount_factor,
         load_model=load_model,
     )
-    dummy_img = torch.zeros(1, 1, 30, 45).to(DEVICE)
-    dummy_vars = torch.zeros(1, NUM_VARS).to(DEVICE)
-    print(agent.q_net(dummy_img, dummy_vars).shape)  # should be (1, num_actions)
 
     # Run the training for the set number of epochs
     if not skip_learning:
@@ -511,13 +471,14 @@ if __name__ == "__main__":
     game.set_mode(vzd.Mode.ASYNC_PLAYER)
     game.init()
 
+    total_score = 0
     for _ in range(episodes_to_watch):
         game.new_episode()
         while not game.is_episode_finished():
             game_state = game.get_state()
             assert game_state is not None
-            state_img = preprocess(game_state.screen_buffer)
-            state_vars = preprocess_vars(game_state.game_variables)
+            state_img = preprocess(game_state.screen_buffer, resolution)
+            state_vars = preprocess_vars(game_state.game_variables, NUM_VARS)
             best_action_index = agent.get_action(state_img, state_vars)
 
             # Instead of make_action(a, frame_repeat) in order to make the animation smooth
@@ -528,4 +489,6 @@ if __name__ == "__main__":
         # Sleep between episodes
         sleep(1.0)
         score = game.get_total_reward()
-        print("Total score: ", score)
+        total_score += score
+        print(f"Episode {episode_num + 1} Total score: {score}")
+    print(f"-----Final score: {total_score / episodes_to_watch}-----")
