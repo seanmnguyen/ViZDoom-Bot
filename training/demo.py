@@ -3,15 +3,9 @@
 import itertools as it
 import os
 import sys
-import random
-from collections import deque
-from time import sleep, time
+from time import sleep
 
-import numpy as np
-import skimage.transform
 import torch
-import torch.nn as nn
-import torch.optim as optim
 from tqdm import trange
 
 import vizdoom as vzd
@@ -60,17 +54,22 @@ if __name__ == "__main__":
     # Get Model Type, set model_savefile, and Agent
     if len(sys.argv) < 2:
         print("Command line argument expected: <model_type>")
-        print("Options: 'basic', 'late_fusion")
+        print("Options: 'q_cnn', 'q_late_fusion")
         exit()
     model_type = sys.argv[1]
-    if model_type == "basic_dqn":
+    if model_type == "q_cnn":
         AgentBuilder = DQNAgent_Basic
-    elif model_type == "late_fusion":
+        model_savefile = f"../models/{model_type}.pth"
+    elif model_type == "q_late_fusion":
         AgentBuilder = DQNAgent_LateFusion
+        model_savefile = f"../models/{model_type}.pth"
+    elif model_type == "late_fusion_long":
+        AgentBuilder = DQNAgent_LateFusion
+        model_savefile = f"../models/{model_type}.pth"
     else:
         print(f"Unexpected model type: {model_type}")
         exit()
-    model_savefile = f"../models/{model_type}.pth"
+    # model_savefile = f"../models/{model_type}.pth"
 
     if len(sys.argv) == 3:
         if sys.argv[2] == "True":

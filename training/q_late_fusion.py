@@ -34,7 +34,7 @@ frame_repeat = 12
 resolution = (30, 45)
 episodes_to_watch = 10
 
-model_savefile = "../models/late_fusion.pth"
+model_savefile = "../models/q_late_fusion.pth"
 save_model = True
 load_model = False
 skip_learning = False
@@ -352,7 +352,7 @@ class DQNAgent:
             if model_weights is not None:  # weights inputted
                 global model_savefile
                 model_savefile = model_weights
-            print("Loading Late Fusion model from:", model_savefile)
+            print("Loading Q-LateFusion model from:", model_savefile)
             sd = torch.load(model_savefile, map_location=DEVICE)  # now this is a dict
 
             # TODO: may need to refactor to be compatible with FiLMDuelQNet

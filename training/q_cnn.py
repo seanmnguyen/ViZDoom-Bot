@@ -35,7 +35,7 @@ frame_repeat = 12
 resolution = (30, 45)
 episodes_to_watch = 10
 
-model_savefile = "../models/basic_dqn.pth"
+model_savefile = "../models/q_cnn.pth"
 save_model = True
 load_model = False
 skip_learning = False
@@ -232,7 +232,7 @@ class DQNAgent:
             if model_weights is not None:  # weights inputted
                 global model_savefile
                 model_savefile = model_weights
-            print("Loading Basic DQN model from:", model_savefile)
+            print("Loading Q-CNN model from:", model_savefile)
             sd = torch.load(model_savefile, map_location=DEVICE)
 
             self.q_net = DuelQNet(action_size).to(DEVICE)
