@@ -491,4 +491,4 @@ if __name__ == "__main__":
         score = game.get_total_reward()
         total_score += score
         print(f"Episode {episode_num + 1} Total score: {score}")
-    print(f"-----Final score: {total_score / episodes_to_watch}-----")
+    print(f"-----Average Score: {total_score / episodes_to_watch}-----")

@@ -14,6 +14,7 @@ import torch.optim as optim
 from tqdm import trange
 
 import vizdoom as vzd
+from utils import *
 
 
 # Q-learning settings
@@ -49,15 +50,6 @@ if torch.cuda.is_available():
 else:
     DEVICE = torch.device("cpu")
 
-
-def preprocess(img):
-    """Down samples image to resolution"""
-    img = skimage.transform.resize(img, resolution)
-    img = img.astype(np.float32)
-    img = np.expand_dims(img, axis=0)
-    return img
-
-
 def create_simple_game():
     print("Initializing doom...")
     game = vzd.DoomGame()
@@ -79,7 +71,7 @@ def test(game, agent):
     for test_episode in trange(test_episodes_per_epoch, leave=False):
         game.new_episode()
         while not game.is_episode_finished():
-            state = preprocess(game.get_state().screen_buffer)
+            state = preprocess(game.get_state().screen_buffer, resolution)
             best_action_index = agent.get_action(state)
 
             game.make_action(actions[best_action_index], frame_repeat)
@@ -111,13 +103,13 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
         print(f"\nEpoch #{epoch + 1}")
 
         for _ in trange(steps_per_epoch, leave=False):
-            state = preprocess(game.get_state().screen_buffer)
+            state = preprocess(game.get_state().screen_buffer, resolution)
             action = agent.get_action(state)
             reward = game.make_action(actions[action], frame_repeat)
             done = game.is_episode_finished()
 
             if not done:
-                next_state = preprocess(game.get_state().screen_buffer)
+                next_state = preprocess(game.get_state().screen_buffer, resolution)
             else:
                 next_state = np.zeros((1, 30, 45)).astype(np.float32)
 
@@ -337,12 +329,13 @@ if __name__ == "__main__":
     game.set_mode(vzd.Mode.ASYNC_PLAYER)
     game.init()
 
+    total_score = 0
     for _ in range(episodes_to_watch):
         game.new_episode()
         while not game.is_episode_finished():
             game_state = game.get_state()
             assert game_state is not None
-            state = preprocess(game_state.screen_buffer)
+            state = preprocess(game_state.screen_buffer, resolution)
             best_action_index = agent.get_action(state)
 
             # Instead of make_action(a, frame_repeat) in order to make the animation smooth
@@ -353,4 +346,6 @@ if __name__ == "__main__":
         # Sleep between episodes
         sleep(1.0)
         score = game.get_total_reward()
-        print("Total score: ", score)
+        total_score += score
+        print(f"Episode {episode_num + 1} Total Score: {score}")
+    print(f"-----Average Score: {total_score / episodes_to_watch}-----")
