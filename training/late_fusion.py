@@ -472,7 +472,7 @@ if __name__ == "__main__":
     game.init()
 
     total_score = 0
-    for _ in range(episodes_to_watch):
+    for episode_num in range(episodes_to_watch):
         game.new_episode()
         while not game.is_episode_finished():
             game_state = game.get_state()

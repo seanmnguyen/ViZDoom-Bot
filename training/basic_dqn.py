@@ -225,9 +225,17 @@ class DQNAgent:
 
         if load_model:
             print("Loading model from: ", model_savefile)
-            self.q_net = torch.load(model_savefile)
-            self.target_net = torch.load(model_savefile)
-            self.epsilon = self.epsilon_min
+            sd = torch.load(model_savefile, map_location=DEVICE)
+
+            self.q_net = DuelQNet(action_size).to(DEVICE)
+            self.q_net.load_state_dict(sd)
+
+            self.target_net = DuelQNet(action_size).to(DEVICE)
+            self.target_net.load_state_dict(sd)
+
+            self.q_net.eval()
+            self.target_net.eval()
+            self.epsilon = 0.0
 
         else:
             print("Initializing new model")
@@ -330,7 +338,7 @@ if __name__ == "__main__":
     game.init()
 
     total_score = 0
-    for _ in range(episodes_to_watch):
+    for episode_num in range(episodes_to_watch):
         game.new_episode()
         while not game.is_episode_finished():
             game_state = game.get_state()

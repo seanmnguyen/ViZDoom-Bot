@@ -16,13 +16,13 @@ from tqdm import trange
 import vizdoom as vzd
 from utils import *
 
-from late_fusion import DQNAgent
-
-# from basic_dqn import DQNAgent
+# from late_fusion import DQNAgent
+from basic_dqn import DQNAgent
 
 # ---------- GLOBALS ----------
 # The main configurations for this demo:
-model_savefile = "../models/late_fusion.pth"
+# model_savefile = "../models/late_fusion.pth"
+model_savefile = "../models/basic_dqn.pth"
 save_model = True
 load_model = True
 # Configuration file path
@@ -87,7 +87,8 @@ if __name__ == "__main__":
             assert game_state is not None
             state_img = preprocess(game_state.screen_buffer, resolution)
             state_vars = preprocess_vars(game_state.game_variables, len(game.get_available_game_variables()))
-            best_action_index = agent.get_action(state_img, state_vars)
+            # best_action_index = agent.get_action(state_img, state_vars)
+            best_action_index = agent.get_action(state_img)
 
             game.set_action(actions[best_action_index])
             for _ in range(frame_repeat):
