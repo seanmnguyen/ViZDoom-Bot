@@ -97,6 +97,7 @@ namespace vizdoom {
         this->amMode = NORMAL;
         this->amRotate = false;
         this->amTextures = true;
+        this->amSprites = false;
 
         this->objects = false;
         this->sectors = false;
@@ -663,6 +664,12 @@ namespace vizdoom {
         if (this->doomRunning) this->setRenderMode(this->getRenderModeValue());
     }
 
+    void DoomController::setAutomapRenderObjectsAsSprites(bool sprites) {
+        this->amSprites = sprites;
+        if (this->doomRunning) this->setRenderMode(this->getRenderModeValue());
+
+    }
+
     /* Objects (actors) and map state */
     bool DoomController::isObjectsEnabled() {
         if (this->doomRunning) return this->gameState->OBJECTS;
@@ -844,8 +851,9 @@ namespace vizdoom {
         if(this->messages)      renderMode |= 128;
         if(this->amRotate)      renderMode |= 256;
         if(this->amTextures)    renderMode |= 512;
-        if(this->corpses)       renderMode |= 1024;
-        if(this->flashes)       renderMode |= 2048;
+        if(this->amSprites)     renderMode |= 1024;
+        if(this->corpses)       renderMode |= 2048;
+        if(this->flashes)       renderMode |= 4096;
 
         return renderMode;
     }
@@ -1230,13 +1238,9 @@ namespace vizdoom {
         // main wad
         if (this->iwadPath.length() == 0) {
             std::string workingDoom2Path = "./doom2.wad";
-            std::string workingDoomPath = "./doom.wad";
             std::string workingFreedoom2Path = "./freedoom2.wad";
-            std::string workingFreedoomPath = "./freedoom.wad";
             std::string sharedDoom2Path = getThisSharedObjectPath() + "/doom2.wad";
-            std::string sharedDoomPath = getThisSharedObjectPath() + "/doom.wad";
             std::string sharedFreedoom2Path = getThisSharedObjectPath() + "/freedoom2.wad";
-            std::string sharedFreedoomPath = getThisSharedObjectPath() + "/freedoom.wad";
 
             if (fileExists(workingDoom2Path)) this->iwadPath = workingDoom2Path;
             else if (fileExists(sharedDoom2Path)) this->iwadPath = sharedDoom2Path;
@@ -1420,7 +1424,7 @@ namespace vizdoom {
             this->doomArgs.push_back("+viz_soft_audio");
             this->doomArgs.push_back("1");
             this->doomArgs.push_back("+snd_backend");
-            this->doomArgs.push_back("openal"); // Force OpenAL sound backendS
+            this->doomArgs.push_back("openal"); // Force OpenAL sound backend
 
             this->doomArgs.push_back("+viz_samp_freq");
             this->doomArgs.push_back(std::to_string(this->audioSamplingFreq));

@@ -523,14 +523,14 @@ Config key: ``ViZDoomPath``/``vizdoom_path``)DOCSTRING";
     const char *setDoomGamePath = R"DOCSTRING(Sets the path to the Doom engine based game file (wad format).
 If not used DoomGame will look for doom2.wad and freedoom2.wad (in that order) in the directory of ViZDoom's installation (where vizdoom library/pyd is).
 
-Default value: ``<ViZDoom library location>/<doom2.wad, doom.wad, freedoom2.wad, or freedoom.wad - in this order>``
+Default value: ``""``
 
 Config key: ``DoomGamePath``/``doom_game_path``)DOCSTRING";
 
     const char *getDoomScenarioPath = R"DOCSTRING(Returns the path to the additional scenario file (wad format).)DOCSTRING";
 
     const char *setDoomScenarioPath = R"DOCSTRING(Sets the path to an additional scenario file (wad format).
-If not provided, the default Doom single-player maps will be loaded.
+If not provided, the default maps of selected Doom engine-based game will be used.
 
 Default value: ``""``
 
@@ -538,7 +538,7 @@ Config key: ``DoomScenarioPath``/``doom_scenario_path``)DOCSTRING";
 
     const char *getDoomMap = R"DOCSTRING(Returns the map name to be used.)DOCSTRING";
 
-    const char *setDoomMap = R"DOCSTRING(Sets the map name to be used.
+    const char *setDoomMap = R"DOCSTRING(Sets the map name to be used. The map name is case insensitive.
 
 Default value: ``"map01"``, if set to empty ``"map01"`` will be used.
 
@@ -551,12 +551,11 @@ The higher the skill, the harder the game becomes.
 Skill level affects monsters' aggressiveness, monsters' speed, weapon damage, ammunition quantities, etc.
 Takes effect from the next episode.
 
-- 1 - VERY EASY, "I'm Too Young to Die" in Doom.
-- 2 - EASY, "Hey, Not Too Rough" in Doom.
-- 3 - NORMAL, "Hurt Me Plenty" in Doom.
-- 4 - HARD, "Ultra-Violence" in Doom.
-- 5 - VERY HARD, "Nightmare!" in Doom.
-
+- 1 - VERY EASY, "I'm Too Young to Die" in Doom/Doom 2.
+- 2 - EASY, "Hey, Not Too Rough" in Doom/Doom 2.
+- 3 - NORMAL, "Hurt Me Plenty" in Doom/Doom 2.
+- 4 - HARD, "Ultra-Violence" in Doom/Doom 2.
+- 5 - VERY HARD, "Nightmare!" in Doom/Doom 2.
 Default value: 3
 
 Config key: ``DoomSkill``/``doom_skill``)DOCSTRING";
@@ -680,6 +679,7 @@ Config key: ``automapBufferEnabled``/``automap_buffer_enabled``
 See also:
 
 - :class:`.GameState`
+- `examples/python/automap_buffer.py <https://github.com/Farama-Foundation/ViZDoom/tree/master/examples/python/automap_buffer.py>`_
 - `examples/python/buffers.py <https://github.com/Farama-Foundation/ViZDoom/tree/master/examples/python/buffers.py>`_,
 
 Note: added in 1.1.0.)DOCSTRING";
@@ -709,6 +709,21 @@ Default value: ``True``
 Config key: ``automapRenderTextures``/``automap_render_textures``
 
 Note: added in 1.1.0.)DOCSTRING";
+
+    const char *setAutomapRenderObjectsAsSprites = R"DOCSTRING(Controls whether things (objects, monsters, items, etc.) are rendered as sprites or as simple triangles on the automap.
+
+When enabled (```True```), things are displayed as rotated sprites with their actual appearance. When disabled (```False```), things are shown as simple triangular markers.
+Works only with ``OBJECTS`` and ``OBJECTS_WITH_SIZE`` automap modes.
+
+Default value: ``False``
+
+Config key: ``automapRenderObjectsAsSprites``/``automap_render_objects_as_sprites``
+
+See also:
+
+- :meth:`set_automap_mode`,
+
+Note: added in 1.3.0.)DOCSTRING";
 
     const char *setRenderHud = R"DOCSTRING(Determine if the hud will be rendered in the game.
 

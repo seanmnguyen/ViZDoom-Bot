@@ -113,6 +113,7 @@ CVAR (String, viz_bots_path, "", CVAR_NOSET)
 
 // audio buffer related
 CVAR (Bool, viz_soft_audio, false, 0)
+CVAR (Bool, viz_reset_audio_on_map_change, true, 0)
 CVAR (Int, viz_samp_freq, 44100, 0)
 CVAR (Int, viz_audio_tics, 1, 0)
 
@@ -353,6 +354,8 @@ EXTERN_CVAR(Bool, am_showmonsters)
 EXTERN_CVAR(Bool, am_showsecrets)
 EXTERN_CVAR(Bool, am_showtime)
 EXTERN_CVAR(Bool, am_showtotaltime)
+EXTERN_CVAR(Int, am_showmaplabel)
+EXTERN_CVAR(Int, am_showthingsprites)
 
 #ifdef VIZ_OS_WIN
     EXTERN_CVAR(Bool, vid_forceddraw);
@@ -426,23 +429,25 @@ void VIZ_CVARsUpdate(){
         am_rotate.CmdSet((*viz_render_mode & 256) != 0 ? "1" : "0");
         am_textured.CmdSet((*viz_render_mode & 512) != 0 ? "1" : "0");
         am_showtriggerlines.CmdSet("2");
-        am_drawmapback.CmdSet("0");
-        if(!*viz_am_center)
-            am_followplayer.CmdSet("1");
+        am_drawmapback.CmdSet("1");
+        if(!*viz_am_center) am_followplayer.CmdSet("1");
+        am_showthingsprites.CmdSet((*viz_render_mode & 1024) != 0 ? "3" : "0");
 
-        am_showitems.CmdSet("0");
-        am_showmonsters.CmdSet("0");
-        am_showsecrets.CmdSet("0");
-        am_showtime.CmdSet("0");
-        am_showtotaltime.CmdSet("0");
+        // automap stats
+        am_showitems.CmdSet(messages ? "1" : "0");
+        am_showmonsters.CmdSet(messages ? "1" : "0");
+        am_showsecrets.CmdSet(messages ? "1" : "0");
+        am_showtime.CmdSet(messages ? "1" : "0");
+        am_showtotaltime.CmdSet("0");  // never show total time
+        am_showmaplabel.CmdSet("0");  // never show map label
 
         // bodies
-        viz_render_corpses.CmdSet((*viz_render_mode & 1024) != 0 ? "1" : "0");
+        viz_render_corpses.CmdSet((*viz_render_mode & 2048) != 0 ? "1" : "0");
 
         // flashes
-        viz_render_flashes.CmdSet((*viz_render_mode & 2048) != 0 ? "1" : "0");
-        //blood_fade_scalar.CmdSet((*viz_render_mode & 2048) != 0 ? "1" : "0");
-        //pickup_fade_scalar.CmdSet((*viz_render_mode & 2048) != 0 ? "1" : "0");
+        viz_render_flashes.CmdSet((*viz_render_mode & 4096) != 0 ? "1" : "0");
+        //blood_fade_scalar.CmdSet((*viz_render_mode & 4096) != 0 ? "1" : "0");
+        //pickup_fade_scalar.CmdSet((*viz_render_mode & 4096) != 0 ? "1" : "0");
     }
 
     am_cheat = *viz_nocheat ? 0 : *viz_automap_mode;

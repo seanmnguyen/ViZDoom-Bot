@@ -60,7 +60,6 @@ game.close()
 :caption: Introduction
 
 introduction/python_quickstart
-introduction/building
 introduction/apis_and_wrappers
 ```
 
@@ -78,8 +77,17 @@ api/configuration_files
 :caption: Environments
 
 environments/default
+environments/original_doom_levels
 environments/third_party
 environments/creating_custom
+```
+
+```{toctree}
+:hidden:
+:caption: Dev guide
+
+dev/dev_guide
+dev/building_from_source
 ```
 
 ```{toctree}

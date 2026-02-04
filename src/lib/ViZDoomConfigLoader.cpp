@@ -491,7 +491,7 @@ namespace vizdoom {
                         for (i = 0; i < str_variables.size(); ++i) {
                             variables.push_back(ConfigLoader::stringToGameVariable(str_variables[i]));
                         }
-                        
+
                         if (!append) this->game->clearAvailableGameVariables();
                         for (i = 0; i < variables.size(); ++i) {
                             this->game->addAvailableGameVariable(variables[i]);
@@ -699,6 +699,10 @@ namespace vizdoom {
                 }
                 else if (key == "automap_render_textures" || key == "automaprendertextures") {
                     this->game->setAutomapRenderTextures(stringToBool(val));
+                    continue;
+                }
+                else if (key == "automap_render_objects_as_sprites" || key == "automaprenderobjectsassprites") {
+                    this->game->setAutomapRenderObjectsAsSprites(stringToBool(val));
                     continue;
                 }
                 else if (key == "objects_info_enabled" || key == "objectsinfoenabled") {

@@ -42,6 +42,7 @@
 #include "d_event.h"
 #include "d_dehacked.h"
 #include "g_game.h"
+#include "i_music.h"
 #include "i_sound.h"
 #include "p_acs.h"
 #include "p_setup.h"
@@ -55,6 +56,7 @@ EXTERN_CVAR (Bool, viz_automap)
 EXTERN_CVAR (Bool, viz_objects)
 EXTERN_CVAR (Bool, viz_sectors)
 EXTERN_CVAR (Bool, viz_soft_audio)
+EXTERN_CVAR (Bool, viz_reset_audio_on_map_change)
 EXTERN_CVAR (Bool, viz_loop_map)
 EXTERN_CVAR (Bool, viz_override_player)
 EXTERN_CVAR (Bool, viz_spectator)
@@ -711,6 +713,13 @@ void VIZ_GameStateInitNew(){
     }
 
     vizUniqueObjectsCount = 0;
+
+    if (*viz_soft_audio && *viz_reset_audio_on_map_change) {
+        I_ShutdownMusic();
+        I_ShutdownSound();
+        I_InitSound();
+    }
+    VIZ_ClearAudioBuffer();
 }
 
 void VIZ_GameStateClose(){

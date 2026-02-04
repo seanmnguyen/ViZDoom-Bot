@@ -14,7 +14,14 @@ try:  # for backwards compatibility with setuptools version < 65
 except ImportError:
     from distutils.command.build import build
 
+from setuptools.command.develop import develop
 from setuptools.command.install import install
+
+
+try:
+    from setuptools.command.editable_wheel import editable_wheel
+except ImportError:  # pragma: no cover - older setuptools
+    editable_wheel = None
 from wheel.bdist_wheel import bdist_wheel
 
 
@@ -222,6 +229,20 @@ class BuildCommand(build):
         build.run(self)
 
 
+class DevelopCommand(develop):
+    def run(self):
+        self.run_command("build")
+        develop.run(self)
+
+
+if editable_wheel is not None:
+
+    class EditableWheelCommand(editable_wheel):
+        def run(self):
+            self.run_command("build")
+            editable_wheel.run(self)
+
+
 setup(
     name="vizdoom",
     version=get_vizdoom_version(),
@@ -232,7 +253,15 @@ setup(
     author="Marek Wydmuch, Michał Kempka, Wojciech Jaśkowski, Farama Foundation, and the respective contributors",
     author_email="mwydmuch@cs.put.poznan.pl",
     extras_require={
-        "test": ["pytest", "psutil"],
+        "test": ["pytest", "pytest-xdist", "psutil"],
+        "dev": [
+            "pytest",
+            "pytest-xdist",
+            "psutil",
+            "pybind11-stubgen",
+            "black",
+            "isort",
+        ],
     },
     install_requires=["numpy", "gymnasium>=0.28.0", "pygame-ce>=2.1.3"],
     python_requires=">=3.9.0,<3.15",
@@ -240,7 +269,17 @@ setup(
     package_dir={"": package_root},
     package_data={"vizdoom": package_data},
     include_package_data=True,
-    cmdclass={"bdist_wheel": Wheel, "build": BuildCommand, "install": InstallPlatlib},
+    cmdclass={
+        "bdist_wheel": Wheel,
+        "build": BuildCommand,
+        "develop": DevelopCommand,
+        "install": InstallPlatlib,
+        **(
+            {"editable_wheel": EditableWheelCommand}
+            if editable_wheel is not None
+            else {}
+        ),
+    },
     distclass=BinaryDistribution,
     platforms=["Linux", "Mac OS X", "Windows"],
     classifiers=[
