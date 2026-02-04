@@ -2,6 +2,7 @@
 
 import itertools as it
 import os
+import sys
 import random
 from collections import deque
 from time import sleep, time
@@ -16,13 +17,11 @@ from tqdm import trange
 import vizdoom as vzd
 from utils import *
 
-# from late_fusion import DQNAgent
-from basic_dqn import DQNAgent
+from late_fusion import DQNAgent as DQNAgent_LateFusion
+from basic_dqn import DQNAgent as DQNAgent_Basic
 
 # ---------- GLOBALS ----------
 # The main configurations for this demo:
-# model_savefile = "../models/late_fusion.pth"
-model_savefile = "../models/basic_dqn.pth"
 save_model = True
 load_model = True
 # Configuration file path
@@ -57,6 +56,24 @@ else:
 
 # ---------- DRIVER ----------
 if __name__ == "__main__":
+    # Get Model Type, set model_savefile, and Agent
+    if len(sys.argv) != 2:
+        print("Command line argument expected: <model_type>")
+        print("Options: 'basic', 'late_fusion")
+        return
+    model_type = sys.argv[1]
+    match(model_type):
+        case "basic":
+            model_savefile = "../models/basic_dqn.pth"
+            AgentBuilder = DQNAgent_Basic
+            break
+        case "late_fusion":
+            model_savefile = "../models/late_fusion.pth"
+            AgentBuilder = DQNAgent_LateFusion
+        default:
+            print(f"Unexpected model type: {model_type}")
+            return
+
     # Initialize game and actions with window visible
     game = vzd.DoomGame()
     game.load_config(config_file_path)
@@ -64,12 +81,16 @@ if __name__ == "__main__":
     game.set_mode(vzd.Mode.ASYNC_PLAYER)
     game.set_screen_format(vzd.ScreenFormat.GRAY8)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
+    # TODO: For late_fusion: modifying .cfg file not working;
+    # Remove manual button additions when .cfg changes recognized
+    game.add_available_button(vzd.Button.MOVE_LEFT)
+    game.add_available_button(vzd.Button.MOVE_RIGHT)
     game.init()
     n = game.get_available_buttons_size()
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
 
     # Initialize our agent with the set parameters
-    agent = DQNAgent(
+    agent = AgentBuilder(
         len(actions),
         lr=learning_rate,
         batch_size=batch_size,
@@ -89,6 +110,7 @@ if __name__ == "__main__":
             state_vars = preprocess_vars(game_state.game_variables, len(game.get_available_game_variables()))
             # best_action_index = agent.get_action(state_img, state_vars)
             best_action_index = agent.get_action(state_img)
+            best_action_index = agent.get_action(state_img, state_vars)
 
             game.set_action(actions[best_action_index])
             for _ in range(frame_repeat):

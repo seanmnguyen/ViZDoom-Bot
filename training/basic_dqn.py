@@ -58,6 +58,10 @@ def create_simple_game():
     game.set_mode(vzd.Mode.PLAYER)
     game.set_screen_format(vzd.ScreenFormat.GRAY8)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
+    # TODO: modifying .cfg file not working;
+    # Remove manual button additions when .cfg changes recognized
+    game.add_available_button(vzd.Button.MOVE_LEFT)
+    game.add_available_button(vzd.Button.MOVE_RIGHT)
     game.init()
     print("Doom initialized.")
 
@@ -212,6 +216,7 @@ class DQNAgent:
         epsilon=1,
         epsilon_decay=0.9996,
         epsilon_min=0.1,
+        model_weights=None
     ):
         self.action_size = action_size
         self.epsilon = epsilon
@@ -224,6 +229,8 @@ class DQNAgent:
         self.criterion = nn.MSELoss()
 
         if load_model:
+            if model_weights is not None:  # weights inputted
+                model_savefile = model_weights
             print("Loading model from: ", model_savefile)
             sd = torch.load(model_savefile, map_location=DEVICE)
 
@@ -244,7 +251,7 @@ class DQNAgent:
 
         self.opt = optim.SGD(self.q_net.parameters(), lr=self.lr)
 
-    def get_action(self, state):
+    def get_action(self, state, state_vars):
         if np.random.uniform() < self.epsilon:
             return random.choice(range(self.action_size))
         else:

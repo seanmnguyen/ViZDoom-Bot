@@ -125,7 +125,7 @@ if __name__ == "__main__":
     # Starting from ViZDoom version 1.3.0 you can set all config options using a single dictionary. E.g.:
     config_dict = {
         "screen_resolution": vzd.ScreenResolution.RES_640X480,
-        "doom_scenario_path": os.path.join(vzd.scenarios_path, "basic.wad"),
+        "doom_scenario_path": os.path.join(vzd.scenarios_path, "defend_the_line.wad"),
         "doom_map": "map01",
         "depth_buffer_enabled": True,
         "labels_buffer_enabled": True,
