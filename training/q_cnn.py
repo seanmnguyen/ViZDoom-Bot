@@ -41,7 +41,8 @@ load_model = False
 skip_learning = False
 
 # Configuration file path
-config_file_path = os.path.join(vzd.scenarios_path, "defend_the_line.cfg")
+config_file_path = os.path.join(SCENARIO_PATH, "defend_the_line.cfg")
+print(config_file_path)
 
 # Uses GPU if available
 if torch.cuda.is_available():
@@ -58,10 +59,6 @@ def create_simple_game():
     game.set_mode(vzd.Mode.PLAYER)
     game.set_screen_format(vzd.ScreenFormat.GRAY8)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
-    # TODO: modifying .cfg file not working;
-    # Remove manual button additions when .cfg changes recognized
-    game.add_available_button(vzd.Button.MOVE_LEFT)
-    game.add_available_button(vzd.Button.MOVE_RIGHT)
     game.init()
     print("Doom initialized.")
 

@@ -3,6 +3,8 @@
 import numpy as np
 import skimage.transform
 
+SCENARIO_PATH = "../scenarios/"
+
 def preprocess_vars(v: np.ndarray, num_vars: int) -> np.ndarray:
     """
     v: game_state.game_variables (shape: [num_vars])
