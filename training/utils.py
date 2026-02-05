@@ -30,3 +30,11 @@ def preprocess(img, resolution):
     img = img.astype(np.float32)
     img = np.expand_dims(img, axis=0)
     return img
+
+def preprocess_rgb(img, resolution=(96, 128)):
+    # img expected HxWx3 (RGB24)
+    x = skimage.transform.resize(
+        img, resolution, anti_aliasing=True, preserve_range=True
+    ).astype(np.float32)
+    x = np.transpose(x, (2, 0, 1))  # -> C,H,W
+    return x
