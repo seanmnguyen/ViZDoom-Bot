@@ -12,11 +12,12 @@ import vizdoom as vzd
 from utils import *
 
 from q_late_fusion import DQNAgent as DQNAgent_LateFusion
+from q_late_fusion_rgb import DQNAgent as DQNAgent_LateFusionRGB
 from q_cnn import DQNAgent as DQNAgent_Basic
 
 # ---------- GLOBALS ----------
 # Configuration file path
-config_file_path = os.path.join(SCENARIO_PATH, "defend_the_line.cfg")
+config_file_path = os.path.join(SCENARIO_PATH, "defend_the_center.cfg")
 
 # Just necessary for building the agent, can mostly ignore
 # Q-learning settings
@@ -45,6 +46,7 @@ else:
 AGENT_BY_MODEL = {
     "q_cnn": DQNAgent_Basic,
     "q_late_fusion": DQNAgent_LateFusion,
+    "q_late_fusion_rgb": DQNAgent_LateFusionRGB,
     "late_fusion_long": DQNAgent_LateFusion,
 }
 
@@ -88,7 +90,7 @@ def parse_cli():
     parser.add_argument(
         "-s", "--show",
         type=str2bool,
-        default=False,
+        default=True,
         metavar="BOOL",
         help="Show game window (True/False)."
     )
@@ -125,11 +127,13 @@ if __name__ == "__main__":
     game.set_mode(vzd.Mode.ASYNC_PLAYER)
     game.set_screen_format(vzd.ScreenFormat.GRAY8)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
-    # TODO: For late_fusion: modifying .cfg file not working;
-    # Remove manual button additions when .cfg changes recognized
-    game.add_available_button(vzd.Button.MOVE_LEFT)
-    game.add_available_button(vzd.Button.MOVE_RIGHT)
     game.set_render_hud(True)
+
+    # Specific configs for QLateFusionRGB
+    if args.model_type == "q_late_fusion_rgb":
+        game.set_screen_format(vzd.ScreenFormat.RGB24)
+        resolution = (96, 128)
+        preprocess = preprocess_rgb
     game.init()
     n = game.get_available_buttons_size()
     actions = [list(a) for a in it.product([0, 1], repeat=n)]

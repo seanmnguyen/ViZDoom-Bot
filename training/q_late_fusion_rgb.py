@@ -20,12 +20,13 @@ from utils import *
 # Q-learning settings
 learning_rate = 0.00025
 discount_factor = 0.99
-train_epochs = 1
-learning_steps_per_epoch = 5000
+train_epochs = 20
+learning_steps_per_epoch = 2000
 replay_memory_size = 10000
 
 # NN learning settings
-batch_size = 256
+batch_size = 64
+train_every = 2
 
 # Training regime
 test_episodes_per_epoch = 100
@@ -49,6 +50,7 @@ if torch.cuda.is_available():
     torch.backends.cudnn.benchmark = True
 else:
     DEVICE = torch.device("cpu")
+print("DEVICE:", DEVICE)
 
 GAME_VARS = [
     vzd.GameVariable.HEALTH,
@@ -81,7 +83,7 @@ def test(game, agent):
         game.new_episode()
         while not game.is_episode_finished():
             game_state = game.get_state()
-            state_img = preprocess(game_state.screen_buffer, resolution)
+            state_img = preprocess_rgb(game_state.screen_buffer, resolution)
             state_vars = preprocess_vars(game_state.game_variables, NUM_VARS)
             best_action_index = agent.get_action(state_img, state_vars)
 
@@ -115,7 +117,7 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
 
         for _ in trange(steps_per_epoch, leave=False):
             game_state = game.get_state()
-            state_img = preprocess(game_state.screen_buffer, resolution)
+            state_img = preprocess_rgb(game_state.screen_buffer, resolution)
             state_vars = preprocess_vars(game_state.game_variables, NUM_VARS)
 
             action = agent.get_action(state_img, state_vars)
@@ -124,7 +126,7 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
 
             if not done:
                 next_game_state = game.get_state()
-                next_img = preprocess(next_game_state.screen_buffer, resolution)
+                next_img = preprocess_rgb(next_game_state.screen_buffer, resolution)
                 next_vars = preprocess_vars(next_game_state.game_variables, NUM_VARS)
             else:
                 next_img = np.zeros((3, resolution[0], resolution[1]), dtype=np.float32)
@@ -132,7 +134,7 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
 
             agent.append_memory(state_img, state_vars, action, reward, next_img, next_vars, done)
 
-            if global_step > agent.batch_size:
+            if len(agent.memory) > agent.batch_size and (global_step % train_every == 0):
                 agent.train()
 
             if done:
@@ -339,10 +341,12 @@ class DQNAgent:
             print("Loading Q-LateFusion model from:", model_savefile)
             sd = torch.load(model_savefile, map_location=DEVICE)  # now this is a dict
 
-            self.q_net = LateFusionDuelQNet(action_size, NUM_VARS).to(DEVICE)
+            self.q_net = LateFusionDuelQNet(
+                action_size, NUM_VARS, in_channels=3, img_h=resolution[0], img_w=resolution[1]).to(DEVICE)
             self.q_net.load_state_dict(sd)
 
-            self.target_net = LateFusionDuelQNet(action_size, NUM_VARS).to(DEVICE)
+            self.target_net = LateFusionDuelQNet(
+                action_size, NUM_VARS, in_channels=3, img_h=resolution[0], img_w=resolution[1]).to(DEVICE)
             self.target_net.load_state_dict(sd)
 
             self.q_net.eval()
@@ -492,7 +496,7 @@ if __name__ == "__main__":
         while not game.is_episode_finished():
             game_state = game.get_state()
             assert game_state is not None
-            state_img = preprocess(game_state.screen_buffer, resolution)
+            state_img = preprocess_rgb(game_state.screen_buffer, resolution)
             state_vars = preprocess_vars(game_state.game_variables, NUM_VARS)
             best_action_index = agent.get_action(state_img, state_vars)
 
