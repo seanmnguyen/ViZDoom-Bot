@@ -20,13 +20,12 @@ from utils import *
 # Q-learning settings
 learning_rate = 0.00025
 discount_factor = 0.99
-train_epochs = 20
-learning_steps_per_epoch = 2000
+train_epochs = 50
+learning_steps_per_epoch = 5000
 replay_memory_size = 10000
 
 # NN learning settings
-batch_size = 64
-train_every = 2
+batch_size = 200  # 64 default; 256 too long; 128, 192 okay
 
 # Training regime
 test_episodes_per_epoch = 100
@@ -50,7 +49,6 @@ if torch.cuda.is_available():
     torch.backends.cudnn.benchmark = True
 else:
     DEVICE = torch.device("cpu")
-print("DEVICE:", DEVICE)
 
 GAME_VARS = [
     vzd.GameVariable.HEALTH,
@@ -58,6 +56,18 @@ GAME_VARS = [
 ]
 NUM_VARS = len(GAME_VARS)
 
+print("----------MODEL CONFIGURATION----------")
+print("DEVICE:", DEVICE)
+print("Learning Rate:", learning_rate)
+print("Discount Factor:", discount_factor)
+print("Train Epochs:", train_epochs)
+print("Learning Steps per Epoch:", learning_steps_per_epoch)
+print("Test Episodes per Epoch:", test_episodes_per_epoch)
+print("Replay Memory Size:", replay_memory_size)
+print("Batch Size:", batch_size)
+print("Frame Repeat:", frame_repeat)
+print("Resolution:", resolution)
+print("Episodes to Watch:", episodes_to_watch)
 
 def create_simple_game():
     print("Initializing doom...")
@@ -134,7 +144,7 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
 
             agent.append_memory(state_img, state_vars, action, reward, next_img, next_vars, done)
 
-            if len(agent.memory) > agent.batch_size and (global_step % train_every == 0):
+            if len(agent.memory) > agent.batch_size:
                 agent.train()
 
             if done:
