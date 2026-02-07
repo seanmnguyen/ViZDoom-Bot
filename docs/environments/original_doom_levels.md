@@ -6,6 +6,51 @@ Because we cannot provide original Doom's and Doom's 2 levels, in order to play 
 You can get them by purchasing the original game from [Steam](https://store.steampowered.com/app/2280/DOOM__DOOM_II/) or [GOG](https://www.gog.com/game/doom_doom_ii).
 You can then place the doom2.wad and doom.wad files into your vizdoom package directory (same directory as vizdoom(.exe)).
 
+## Configuration
+
+All scenarios/environments based on original Doom levels use the same configuration file.
+
+**STATE/OBSERVATION**
+Full Doom hud is rendered with in-game messages are rendered.
+As it contains all information about health, armor, ammo, keys, etc., no additional game variables are included in the state by default.
+Additionally the automap and audio buffers are enabled as a part of the state.
+By default, the original Doom resolution of 320x240 is used.
+
+
+**ACTION SPACE**
+The action space includes all the buttons available in the original Doom, such as movement, shooting, weapon switching, etc.
+- `ATTACK` - shoot
+- `SPEED` - run (move faster)
+- `STRAFE` - strafe (move sideways)
+- `USE` - use (open doors, activate switches, etc.)
+- `MOVE_RIGHT`, `MOVE_LEFT`, `MOVE_BACKWARD`, `MOVE_FORWARD` - move in the corresponding direction
+- `TURN_RIGHT`, `TURN_LEFT` - turn in the corresponding direction
+- `SELECT_WEAPON1`, `SELECT_WEAPON2`, ..., `SELECT_WEAPON7` - select the corresponding weapon (if available)
+- `SELECT_NEXT_WEAPON` - select the next weapon in the inventory
+- `SELECT_PREV_WEAPON` - select the previous weapon in the inventory
+
+
+**REWARDS**
+The reward structure is simgple, 1 is assigned for reaching the end of the level, and 0 otherwise.
+This means that the agent receives a reward of 1 only when it successfully completes the level, and receives a reward of 0 for all other actions and states.
+
+You can modify the reward structure by using ViZDoom's built-in reward shaping features, such as assigning rewards for picking up items, killing enemies, or taking damage.
+See:
+- [`DoomGame.set_living_reward`](../api/doom_game.md#vizdoom.DoomGame.set_living_reward)
+- [`DoomGame.set_death_penalty`](../api/doom_game.md#vizdoom.DoomGame.set_death_penalty)
+- [`DoomGame.set_kill_reward`](../api/doom_game.md#vizdoom.DoomGame.set_kill_reward)
+- [`DoomGame.set_item_reward`](../api/doom_game.md#vizdoom.DoomGame.set_item_reward)
+- [`DoomGame.set_secret_reward`](../api/doom_game.md#vizdoom.DoomGame.set_secret_reward)
+- [`DoomGame.set_hit_reward`](../api/doom_game.md#vizdoom.DoomGame.set_hit_reward)
+- [`DoomGame.set_hit_taken_penalty`](../api/doom_game.md#vizdoom.DoomGame.set_hit_taken_penalty)
+- [`DoomGame.set_damage_made_reward`](../api/doom_game.md#vizdoom.DoomGame.set_damage_made_reward)
+- [`DoomGame.set_damage_taken_penalty`](../api/doom_game.md#vizdoom.DoomGame.set_damage_taken_penalty)
+- [`DoomGame.set_health_reward`](../api/doom_game.md#vizdoom.DoomGame.set_health_reward)
+- [`DoomGame.set_armor_reward`](../api/doom_game.md#vizdoom.DoomGame.set_armor_reward)
+- [`DoomGame.set_last_reward`](../api/doom_game.md#vizdoom.DoomGame.set_last_reward)
+- [`DoomGame.set_map_exit_reward`](../api/doom_game.md#vizdoom.DoomGame.set_map_exit_reward)
+
+
 ## Convention of environment names in Gymnasium
 
 The naming convention of original Doom levels environments is as follows:
