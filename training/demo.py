@@ -14,10 +14,17 @@ from utils import *
 from q_late_fusion import DQNAgent as DQNAgent_LateFusion
 from q_late_fusion_rgb import DQNAgent as DQNAgent_LateFusionRGB
 from q_cnn import DQNAgent as DQNAgent_Basic
+from ppo_cnn import PPOAgent
 
 # ---------- GLOBALS ----------
-# Configuration file path
-config_file_path = os.path.join(SCENARIO_PATH, "defend_the_center.cfg")
+# Default scenario for each model type (matches training configs)
+MODEL_DEFAULT_SCENARIO = {
+    "q_cnn": "defend_the_line.cfg",
+    "q_late_fusion": "defend_the_center.cfg",
+    "q_late_fusion_rgb": "defend_the_center.cfg",
+    "late_fusion_long": "defend_the_center.cfg",
+    "ppo_cnn": "defend_the_line.cfg",
+}
 
 # Just necessary for building the agent, can mostly ignore
 # Q-learning settings
@@ -48,7 +55,12 @@ AGENT_BY_MODEL = {
     "q_late_fusion": DQNAgent_LateFusion,
     "q_late_fusion_rgb": DQNAgent_LateFusionRGB,
     "late_fusion_long": DQNAgent_LateFusion,
+    "ppo_cnn": PPOAgent,
 }
+
+# PPO model interface
+PPO_MODELS = {"ppo_cnn"}
+
 
 def str2bool(v):
     """Parse bools from CLI strings."""
@@ -62,6 +74,7 @@ def str2bool(v):
     raise argparse.ArgumentTypeError(
         f"Invalid boolean value: '{v}'. Use True/False."
     )
+
 
 def parse_cli():
     '''
@@ -95,6 +108,13 @@ def parse_cli():
         help="Show game window (True/False)."
     )
 
+    parser.add_argument(
+        "-sc", "--scenario",
+        type=str,
+        default=None,
+        help="Scenario config file (e.g., defend_the_line.cfg). Defaults to training scenario for model type."
+    )
+
     # -h / --help is automatically provided by argparse
     args = parser.parse_args()
 
@@ -116,8 +136,14 @@ if __name__ == "__main__":
     model_loadfile = str(model_path)     # for loading
     visible_window = args.show
 
+    # Resolve scenario config - use CLI arg or default for model type
+    scenario_file = args.scenario if args.scenario else MODEL_DEFAULT_SCENARIO.get(
+        args.model_type, "defend_the_center.cfg")
+    config_file_path = os.path.join(SCENARIO_PATH, scenario_file)
+
     print("model_type:", args.model_type)
     print("load path :", model_loadfile)
+    print("scenario  :", scenario_file)
     print("show      :", visible_window)
 
     # Initialize game and actions with window visible
@@ -139,15 +165,23 @@ if __name__ == "__main__":
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
 
     # Initialize our agent with the set parameters
-    agent = AgentBuilder(
-        len(actions),
-        lr=learning_rate,
-        batch_size=batch_size,
-        memory_size=replay_memory_size,
-        discount_factor=discount_factor,
-        load_model=True,
-        model_weights=model_path,
-    )
+    if args.model_type in PPO_MODELS:
+        # PPO agents have a different constructor
+        agent = AgentBuilder(
+            action_size=len(actions),
+            load_model_path=model_path,
+        )
+    else:
+        # DQN-based agents
+        agent = AgentBuilder(
+            len(actions),
+            lr=learning_rate,
+            batch_size=batch_size,
+            memory_size=replay_memory_size,
+            discount_factor=discount_factor,
+            load_model=True,
+            model_weights=model_path,
+        )
 
     # Play episode with model
     total_score = 0
@@ -157,8 +191,15 @@ if __name__ == "__main__":
             game_state = game.get_state()
             assert game_state is not None
             state_img = preprocess(game_state.screen_buffer, resolution)
-            state_vars = preprocess_vars(game_state.game_variables, len(game.get_available_game_variables()))
-            best_action_index = agent.get_action(state_img, state_vars)
+            state_vars = preprocess_vars(game_state.game_variables, len(
+                game.get_available_game_variables()))
+
+            # PPO agents use deterministic=True for evaluation
+            if args.model_type in PPO_MODELS:
+                best_action_index = agent.get_action(
+                    state_img, deterministic=True)
+            else:
+                best_action_index = agent.get_action(state_img, state_vars)
 
             game.set_action(actions[best_action_index])
             for _ in range(frame_repeat):
