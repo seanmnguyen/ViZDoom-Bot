@@ -2,6 +2,9 @@
 
 #####################################################################
 # Example for running a vizdoom scenario as a Gymnasium env
+#
+# To see the list of available environments go to
+# https://vizdoom.farama.org/main/environments/default/
 #####################################################################
 
 import time
@@ -35,7 +38,7 @@ if __name__ == "__main__":
     # Create the Gymnasium environment
     env = gymnasium.make(
         # Env ID, render_mode and frame_skip can be changed as needed
-        "VizdoomBasicAudio-v1",
+        "VizdoomBasic-v1",
         render_mode="human",
         frame_skip=4,
         # Additional parameters can be passed to override the default environment config, however they should not be used for evaluation
@@ -54,6 +57,7 @@ if __name__ == "__main__":
             print(f"Reward: {rew}")
             print(f"Terminated: {terminated}, Truncated: {truncated}")
             print(f"Info: {info}")
+            print("=====================")
 
             time.sleep(
                 1.0 / vzd.DEFAULT_TICRATE * env.unwrapped.frame_skip
