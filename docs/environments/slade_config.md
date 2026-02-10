@@ -12,7 +12,7 @@ For all these steps it is assumed that user installed ViZDoom in venv under `/ho
 
 ## 1. Configuring SLADE base resource paths
 
-```{figure} _static/img/slade/slade_new_window.png
+```{figure} ../_static/img/slade/slade_new_window.png
    :alt: SLADE new window
 ```
 
@@ -23,13 +23,13 @@ All default WAD files available in ViZDoom are created for Doom/Freedoom 2 games
 Then in the `ZDoom PK3 Path` below select `vizdoom.pk3` file located in the ViZDoom package. In our case, it is `/home/marek/ViZDoom/venv/lib/python-3.13/site-packages/vizdoom/vizdoom.pk3`.
 After adding the paths, it should look like this:
 
-```{figure} _static/img/slade/base_resource_config.png
+```{figure} ../_static/img/slade/base_resource_config.png
    :alt: SLADE resource paths
 ```
 
 ## 2. Configuring ACS compiler
 
-```{figure} _static/img/slade/acs_compiler_config.png
+```{figure} ../_static/img/slade/acs_compiler_config.png
    :alt: SLADE ACS compiler configuration
 ```
 Next, you need to configure the ACS compiler. Go to `Edit` -> `Preferences` -> `Scripting` -> `ACS`. In the `Location of acc executable` field, you need to select the path to the `acc` executable located in the ViZDoom venv. In our case, it is `/home/marek/ViZDoom/acc-1.60-linux64/acc`. You also need to add the following parameters in the `Parameters` field:
@@ -41,7 +41,7 @@ Now you are ready to edit maps using SLADE. You can load one of the existing WAD
 When lunching map editor it is important to select matching game and base resource. In our case it is `Doom2` game for `freedoom2.wad`.
 For source port after select `ZDoom` which is a base of ViZDoom.
 
-```{figure} _static/img/slade/map_editor_config.png
+```{figure} ../_static/img/slade/map_editor_config.png
    :alt: SLADE map editor configuration
 ```
 
@@ -56,6 +56,6 @@ Map editor allows you to run the map directly from the editor. It will ask you t
 
 The editor may show a warning about missing node builder. You can ignore it, as ViZDoom has it built in and does not require it to be installed.
 
-```{figure} _static/img/slade/node_builder_warning.png
+```{figure} ../_static/img/slade/node_builder_warning.png
    :alt: SLADE node builder warning
 ```
