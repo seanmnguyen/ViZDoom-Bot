@@ -10,6 +10,7 @@ import warnings
 
 import gymnasium
 
+# Importing the wrapper registers the ViZDoom environments in Gymnasium, so it should be imported before creating the environment
 from vizdoom import gymnasium_wrapper  # noqa
 
 
