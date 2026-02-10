@@ -11,7 +11,7 @@ import numpy as np
 from gymnasium.spaces import Box, Dict, Discrete, MultiBinary, MultiDiscrete, Text
 from gymnasium.utils.env_checker import check_env, data_equivalence
 
-from vizdoom import gymnasium_wrapper, scenarios_path  # noqa
+from vizdoom import gymnasium_wrapper, install_path  # noqa
 from vizdoom.gymnasium_wrapper.base_gymnasium_env import ASCII_CHARS, VizdoomEnv
 
 
@@ -49,7 +49,7 @@ VIZDOOM_ENVS = [
     if "Vizdoom" in env
 ]
 # Skip environments with higher skills levels for testing purposes as they only differ with a single parameter
-for skill in ["-S2-", "-S3-", "-S4-", "-S5-"]:
+for skill in ["-S1-", "-S2-", "-S4-", "-S5-"]:
     VIZDOOM_ENVS = [env for env in VIZDOOM_ENVS if skill not in env]
 
 TEST_ENV_CONFIGS = f"{os.path.dirname(os.path.abspath(__file__))}/env_configs"
@@ -80,15 +80,16 @@ def _check_if_main_wad_available(env_name: str, env: gymnasium.Env) -> None:
     Helper function to check if specified main WAD file is available for the given environment.
     """
     main_wad_path = env.unwrapped.game.get_doom_game_path()
-    if (
-        main_wad_path is not None
-        and main_wad_path != ""
-        and not os.path.exists(main_wad_path)
-        and not os.path.exists(os.path.join(scenarios_path, main_wad_path))
-    ):
-        pytest.skip(
-            f"Main WAD file {main_wad_path} not available for {env_name}, skipping test."
-        )
+    if main_wad_path is not None and main_wad_path != "":
+        basename = os.path.basename(main_wad_path)
+        if (
+            not os.path.exists(main_wad_path)
+            and not os.path.exists(basename)
+            and not os.path.exists(os.path.join(install_path, basename))
+        ):
+            pytest.skip(
+                f"Main WAD file {main_wad_path} not available for {env_name}, skipping test."
+            )
 
 
 def _run_with_pytest_skip(func, *args, **kwargs):

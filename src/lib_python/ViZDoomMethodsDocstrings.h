@@ -521,8 +521,9 @@ Config key: ``ViZDoomPath``/``vizdoom_path``)DOCSTRING";
     const char *getDoomGamePath = R"DOCSTRING(Returns the path to the Doom engine based game file (wad format).)DOCSTRING";
 
     const char *setDoomGamePath = R"DOCSTRING(Sets the path to the Doom engine-based game file (wad format).
-If set to empty, DoomGame will look for doom2.wad, DOOM2.WAD, and freedoom2.wad (in that order) in the working directory first and then in ViZDoom's installation directory
+If set to empty, DoomGame will look for doom2.wad, and freedoom2.wad (in that order) in the working directory first and then in ViZDoom's installation directory
 (where vizdoom library/pyd is).
+If the path is set and the file does not exist, ViZDoom will check if the file exists in the working directory and then in ViZDoom's installation directory.
 
 Default value: ``""``
 
