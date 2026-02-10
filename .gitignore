@@ -119,3 +119,5 @@ src/vizdoom/zlib/CTestTestfile.cmake
 
 # CLion & PyCharm
 **/.idea
+
+vizdoom-env/
