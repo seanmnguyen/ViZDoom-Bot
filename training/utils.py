@@ -4,8 +4,28 @@ import numpy as np
 import skimage.transform
 import vizdoom as vzd
 
+# ---------- CONSTANTS ----------
 SCENARIO_PATH = "../scenarios/"
 
+# Q-learning settings
+LEARNING_RATE = 0.00025
+DISCOUNT_FACTOR = 0.99
+TRAIN_EPOCHS = 10
+LEARNING_STEPS_PER_EPOCH = 2000
+REPLAY_MEMORY_SIZE = 10000
+
+# NN learning settings
+BATCH_SIZE = 128
+
+# Training regime
+TEST_EPISODES_PER_EPOCH = 100
+
+# Other parameters
+FRAME_REPEAT = 12
+RESOLUTION = (96, 128)
+EPISODES_TO_WATCH = 10
+
+# ---------- HELPER FUNCTIONS ----------
 def preprocess_vars(v: np.ndarray, num_vars: int) -> np.ndarray:
     """
     v: game_state.game_variables (shape: [num_vars])
