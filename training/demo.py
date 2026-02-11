@@ -13,16 +13,17 @@ from utils import *
 
 from q_late_fusion import DQNAgent as DQNAgent_LateFusion
 from q_late_fusion_rgb import DQNAgent as DQNAgent_LateFusionRGB
-from q_cnn import DQNAgent as DQNAgent_Basic
+from q_cnn import DQNAgent as DQNAgent_CNN
+from q_cnn_rgb import DQNAgent as DQNAgent_CNNRGB
 from ppo_cnn import PPOAgent
 
 # ---------- GLOBALS ----------
 # Default scenario for each model type (matches training configs)
 MODEL_DEFAULT_SCENARIO = {
     "q_cnn": "defend_the_line.cfg",
+    "q_cnn_rgb": "defend_the_line.cfg",
     "q_late_fusion": "defend_the_center.cfg",
     "q_late_fusion_rgb": "defend_the_center.cfg",
-    "late_fusion_long": "defend_the_center.cfg",
     "ppo_cnn": "defend_the_line.cfg",
 }
 
@@ -37,7 +38,6 @@ batch_size = 64
 
 # Other parameters
 frame_repeat = 12
-resolution = (30, 45)
 EPISODES_TO_WATCH = 5
 
 # Uses GPU if available
@@ -51,11 +51,31 @@ else:
 # ---------- CLI PARSER ----------
 # Map model type -> agent class
 AGENT_BY_MODEL = {
-    "q_cnn": DQNAgent_Basic,
+    "q_cnn": DQNAgent_CNN,
+    "q_cnn_rgb": DQNAgent_CNNRGB,
     "q_late_fusion": DQNAgent_LateFusion,
     "q_late_fusion_rgb": DQNAgent_LateFusionRGB,
-    "late_fusion_long": DQNAgent_LateFusion,
     "ppo_cnn": PPOAgent,
+}
+
+# Map model type -> resolution (for preprocessing)
+RESOLUTION_BY_MODEL = {
+    "q_cnn": (30, 45),
+    "q_cnn_rgb": (96, 128),
+    "q_late_fusion": (30, 45),
+    "q_late_fusion_rgb": (96, 128),
+    "ppo_cnn": (30, 45),
+}
+
+# Map model type -> RGB or grayscale
+GRAYSCALE = "GRAY8"
+RGB = "RGB24"
+COLOR_BY_MODEL = {
+    "q_cnn": GRAYSCALE,
+    "q_cnn_rgb": RGB,
+    "q_late_fusion": GRAYSCALE,
+    "q_late_fusion_rgb": RGB,
+    "ppo_cnn": GRAYSCALE,
 }
 
 # PPO model interface
@@ -151,15 +171,20 @@ if __name__ == "__main__":
     game.load_config(config_file_path)
     game.set_window_visible(visible_window)
     game.set_mode(vzd.Mode.ASYNC_PLAYER)
-    game.set_screen_format(vzd.ScreenFormat.GRAY8)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
     game.set_render_hud(True)
 
     # Specific configs for QLateFusionRGB
-    if args.model_type == "q_late_fusion_rgb":
+    if COLOR_BY_MODEL[args.model_type] == RGB:
         game.set_screen_format(vzd.ScreenFormat.RGB24)
-        resolution = (96, 128)
         preprocess = preprocess_rgb
+    elif COLOR_BY_MODEL[args.model_type] == GRAYSCALE:
+        game.set_screen_format(vzd.ScreenFormat.GRAY8)
+        preprocess = preprocess
+    else:
+        raise ValueError(f"Invalid color format for model type {args.model_type}")
+
+    resolution = RESOLUTION_BY_MODEL[args.model_type]
     game.init()
     n = game.get_available_buttons_size()
     actions = [list(a) for a in it.product([0, 1], repeat=n)]

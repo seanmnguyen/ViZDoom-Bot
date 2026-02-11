@@ -35,7 +35,7 @@ config_file_path = os.path.join(SCENARIO_PATH, f"{SCENARIO_NAME}.cfg")
 
 # Other parameters
 frame_repeat = 12
-resolution = (96, 128)  # (30, 45) default; (96, 128) to keep aspect ratio
+resolution = (30, 45)  # (30, 45) default; (96, 128) to keep aspect ratio
 episodes_to_watch = 10
 
 # Save to a new model file to not overwrite

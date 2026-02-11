@@ -3,6 +3,7 @@
 ## Defend the Line Scenario
 
 ### Scenario Description
+
 - Actions: TURN_LEFT, TURN_RIGHT, ATTACK, MOVE_LEFT, MOVE_RIGHT
 - Game Variables: AMMO2, HEALTH
 - Rewards: kills (+1), dying (-1)
@@ -17,7 +18,7 @@
 - Colors: GRAYSCALE
 - Training parameters: resolution=(30, 45), epochs=10, learning_steps_per_epoch=2000, batch_size=64
 - Earlier versions:
-  - q_late_fusion_gray1.pth 
+  - q_late_fusion_gray1.pth
 - Performance: Average Score = 16.2
 - Trainer: Sean Nguyen
 
@@ -38,35 +39,35 @@ python3 demo.py -mt q_late_fusion -mp ../models/defend_the_line/q_late_fusion_gr
 Demo:
 
 ```
-python3 demo.py -mt q_late_fusion -mp ../models/defend_the_line/q_late_fusion_rgb.pth -s True -sc defend_the_line.cfg
+python3 demo.py -mt q_late_fusion_rgb -mp ../models/defend_the_line/q_late_fusion_rgb.pth -s True -sc defend_the_line.cfg
 ```
 
 #### q_cnn_gray.pth
 
 - Architecture: QCNN --> CNN (screen buffer)
 - Colors: GRAYSCALE
-- Training parameters: 
+- Training parameters:
 - Performance: Average Score = TODO
 - Trainer: Jason Skeoch
 
 Demo:
 
 ```
-python3 demo.py -mt q_cnn -mp ../models/defend_the_line/q_cnn_rgb.pth -s True -sc defend_the_line.cfg
+python3 demo.py -mt q_cnn -mp ../models/defend_the_line/q_cnn_gray.pth -s True -sc defend_the_line.cfg
 ```
 
 #### q_cnn_rgb.pth
 
 - Architecture: QCNN --> CNN (screen buffer)
 - Colors: RGB24
-- Training parameters: 
+- Training parameters:
 - Performance: Average Score = 20.6
 - Trainer: Eric Lee
 
 Demo:
 
 ```
-python3 demo.py -mt q_cnn -mp ../models/defend_the_line/q_cnn_rgb.pth -s True -sc defend_the_line.cfg
+python3 demo.py -mt q_cnn_rgb -mp ../models/defend_the_line/q_cnn_rgb.pth -s True -sc defend_the_line.cfg
 ```
 
 ### PPO Learning
@@ -75,7 +76,7 @@ python3 demo.py -mt q_cnn -mp ../models/defend_the_line/q_cnn_rgb.pth -s True -s
 
 - Architecture: PPO_CNN --> CNN (screen buffer)
 - Colors: GRAYSCALE
-- Training parameters: 
+- Training parameters:
 - Performance: 6.6
 - Trainer: Ryan Vo, Deja Dominguez
 
@@ -89,11 +90,13 @@ python3 demo.py -mt ppo_cnn -mp ../models/defend_the_line/ppo_cnn_gray.pth -s Tr
 
 - Architecture: PPO_CNN --> CNN (screen buffer)
 - Colors: RGB24
-- Training parameters: 
+- Training parameters:
 - Performance: 17.0
 - Trainer: Ryan Vo, Deja Dominguez
 
 Demo:
+
+TODO: change demo to use `-mt ppo_cnn_rgb`
 
 ```
 python3 demo.py -mt ppo_cnn -mp ../models/defend_the_line/ppo_cnn_rgb.pth -s True -sc defend_the_line.cfg
@@ -102,6 +105,7 @@ python3 demo.py -mt ppo_cnn -mp ../models/defend_the_line/ppo_cnn_rgb.pth -s Tru
 ## Defend the Center Scenario
 
 ### Scenario Description
+
 - Actions: TURN_LEFT, TURN_RIGHT, ATTACK
 - Game Variables: AMMO2, HEALTH
 - Rewards: kills (+1), dying (-1)
@@ -116,13 +120,15 @@ python3 demo.py -mt ppo_cnn -mp ../models/defend_the_line/ppo_cnn_rgb.pth -s Tru
 - Colors: GRAYSCALE
 - Training parameters: resolution=(96, 128), epochs=50, learning_steps_per_epoch=5000, batch_size=200
 - Earlier versions:
-  - q_late_fusion_gray.pth 
+  - q_late_fusion_gray.pth
   - q_late_fusion_gray2.pth
   - q_late_fusion_gray3.pth
 - Performance: Average Score = 7.1
 - Trainer: Sean Nguyen
 
-Demo: 
+TODO: demo only works if you change resolution to (96, 128)
+
+Demo:
 
 ```
 python3 demo.py -mt q_late_fusion -mp ../models/defend_the_center/q_late_fusion_gray_best.pth -s True -sc defend_the_center.cfg
@@ -134,13 +140,13 @@ python3 demo.py -mt q_late_fusion -mp ../models/defend_the_center/q_late_fusion_
 - Colors: RGB24
 - Training parameters: resolution=(96, 128), epochs=50, learning_steps_per_epoch=5000, batch_size=200
 - Earlier versions:
-  - q_late_fusion_rgb1.pth 
+  - q_late_fusion_rgb1.pth
   - q_late_fusion_rgb2.pth
   - q_late_fusion_rgb3.pth
 - Performance: Average Score = 9.4
 - Trainer: Sean Nguyen
 
-Demo: 
+Demo:
 
 ```
 python3 demo.py -mt q_late_fusion_rgb -mp ../models/defend_the_center/q_late_fusion_rgb_best.pth -s True -sc defend_the_center.cfg
