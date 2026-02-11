@@ -20,28 +20,29 @@ from utils import *
 # Q-learning settings
 learning_rate = 0.00025
 discount_factor = 0.99
-train_epochs = 50
-learning_steps_per_epoch = 5000
+train_epochs = 10 # 10 default
+learning_steps_per_epoch = 2000 # 2000 default
 replay_memory_size = 10000
 
 # NN learning settings
-batch_size = 200  # 64 default; 256 too long; 128, 192 okay
+batch_size = 64 # 64 default; 256 too long; 128, 192 okay
 
 # Training regime
 test_episodes_per_epoch = 100
 
+# Configuration file path
+SCENARIO_NAME = "defend_the_line"
+config_file_path = os.path.join(SCENARIO_PATH, f"{SCENARIO_NAME}.cfg")
+
 # Other parameters
 frame_repeat = 12
-resolution = (96, 128)
+resolution = (96, 128)  # (30, 45) default; (96, 128) to keep aspect ratio
 episodes_to_watch = 10
 
-model_savefile = "../models/q_late_fusion_rgb.pth"
+model_savefile = f"../models/{SCENARIO_NAME}/q_late_fusion_rgb.pth"
 save_model = True
 load_model = False
 skip_learning = False
-
-# Configuration file path
-config_file_path = os.path.join(SCENARIO_PATH, "defend_the_center.cfg")
 
 # Uses GPU if available
 if torch.cuda.is_available():
@@ -88,6 +89,12 @@ def create_simple_game():
 def test(game, agent):
     """Runs a test_episodes_per_epoch episodes and prints the result"""
     print("\nTesting...")
+
+    # Switch to eval mode, set epsilon to 0 to remove random decisions
+    old_epsilon = agent.epsilon
+    agent.epsilon = 0.0
+    agent.q_net.eval()
+
     test_scores = []
     for test_episode in trange(test_episodes_per_epoch, leave=False):
         game.new_episode()
@@ -109,6 +116,10 @@ def test(game, agent):
         "min: %.1f" % test_scores.min(),
         "max: %.1f" % test_scores.max(),
     )
+
+    # Restore epsilon and training mode
+    agent.epsilon = old_epsilon
+    agent.q_net.train()
 
 
 def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
@@ -369,6 +380,8 @@ class DQNAgent:
                 action_size, NUM_VARS, in_channels=3, img_h=resolution[0], img_w=resolution[1]).to(DEVICE)
             self.target_net = LateFusionDuelQNet(
                 action_size, NUM_VARS, in_channels=3, img_h=resolution[0], img_w=resolution[1]).to(DEVICE)
+            self.q_net.eval()
+            self.target_net.eval()
 
         self.opt = optim.Adam(self.q_net.parameters(), lr=self.lr)
         self.update_target_net()
