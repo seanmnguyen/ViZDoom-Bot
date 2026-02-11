@@ -50,3 +50,19 @@ where:
 
 - `{SCENARIO_NAME}` is imported from `utils.py`. You do not need to change this.
 - `<ADD_NAME_HERE>` is the model weights file name. You need to add this.
+
+## Updating demo.py
+
+After creating a new training file and training the model, you'll need to update the `demo.py` file so we can run the model.
+
+The model type should be the name of your training file (e.g. if your training file is `ppo_late_fusion_rgb.py`, then model type should be `ppo_late_fusion_rgb`).
+
+First, import your Agent under "AGENTS IMPORT".
+
+Then, go to the Model Mappings section and add the following:
+
+- MODEL_DEFAULT_SCENARIO: map your model type to whatever scenario you trained
+- AGENT_BY_MODEL: map your model type to the Agent you imported
+- RESOLUTION_BY_MODEL: map your model type to your resolution (this is mostly for backwards compatiability. It should be the default (96, 128))
+- COLOR_BY_MODEL: map your model type to RGB or GRAYSCALE appropriately
+- PPO_MODELS: add your model type here if it uses PPO learning

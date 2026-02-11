@@ -11,6 +11,7 @@ from pathlib import Path
 import vizdoom as vzd
 from utils import *
 
+# AGENT IMPORTS
 from q_late_fusion import DQNAgent as DQNAgent_LateFusion
 from q_late_fusion_rgb import DQNAgent as DQNAgent_LateFusionRGB
 from q_cnn import DQNAgent as DQNAgent_CNN
@@ -18,15 +19,6 @@ from q_cnn_rgb import DQNAgent as DQNAgent_CNNRGB
 from ppo_cnn import PPOAgent
 
 # ---------- GLOBALS ----------
-# Default scenario for each model type (matches training configs)
-MODEL_DEFAULT_SCENARIO = {
-    "q_cnn": "defend_the_line.cfg",
-    "q_cnn_rgb": "defend_the_line.cfg",
-    "q_late_fusion": "defend_the_center.cfg",
-    "q_late_fusion_rgb": "defend_the_center.cfg",
-    "ppo_cnn": "defend_the_line.cfg",
-}
-
 # Just necessary for building the agent, can mostly ignore
 # Q-learning settings
 learning_rate = 0.00025
@@ -48,7 +40,16 @@ else:
     DEVICE = torch.device("cpu")
 
 
-# ---------- CLI PARSER ----------
+# ---------- MODEL MAPPINGS ----------
+# Default scenario for each model type (matches training configs)
+MODEL_DEFAULT_SCENARIO = {
+    "q_cnn": "defend_the_line.cfg",
+    "q_cnn_rgb": "defend_the_line.cfg",
+    "q_late_fusion": "defend_the_center.cfg",
+    "q_late_fusion_rgb": "defend_the_center.cfg",
+    "ppo_cnn": "defend_the_line.cfg",
+}
+
 # Map model type -> agent class
 AGENT_BY_MODEL = {
     "q_cnn": DQNAgent_CNN,
@@ -82,6 +83,7 @@ COLOR_BY_MODEL = {
 PPO_MODELS = {"ppo_cnn"}
 
 
+# ---------- CLI PARSER ----------
 def str2bool(v):
     """Parse bools from CLI strings."""
     if isinstance(v, bool):
