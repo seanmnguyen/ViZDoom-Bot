@@ -1088,41 +1088,6 @@ Returns true if the configuration was successfully applied, false if errors occu
 Note: added in 1.3.0
 
 
-### `setConfig`
-
-| C++    | `bool setConfig(std::string config)`               |
-| :--    | :--                                                |
-| Python | `set_config(config: str | dict[str, any]) -> bool` |
-
-Sets configuration from a config string or dictionary (Python only).
-
-This method accepts either a configuration string (in the same format as .cfg files)
-or a Python dictionary with configuration key-value pairs.
-
-When using a dictionary:
-- Keys should be configuration parameter names (e.g., 'screen_resolution', 'doom_skill')
-- Values can be:
-  - Primitive types: str, int, float, bool
-  - Enums: Button, GameVariable, ScreenResolution, ScreenFormat, SamplingRate, Mode, AutomapMode
-  - Lists: for 'available_buttons' and 'available_game_variables'
-
-Relative paths (e.g., for 'doom_scenario_path') are resolved relative to the current working directory.
-
-Example:
-```
-    game.set_config({
-        'screen_resolution': ScreenResolution.RES_640X480,
-        'screen_format': ScreenFormat.CRCGCB,
-        'doom_skill': 5,
-        'available_buttons': [Button.MOVE_LEFT, Button.MOVE_RIGHT, Button.ATTACK],
-        'available_game_variables': [GameVariable.AMMO2],
-        'living_reward': -1
-    })
-```
-
-Returns true if the configuration was successfully applied, false if errors occurred.
-
-
 ---
 ### `getMode`
 
@@ -1226,8 +1191,9 @@ Returns the path to the Doom engine based game file (wad format).
 | Python | `set_doom_game_path(file_path: str) -> None` |
 
 Sets the path to the Doom engine-based game file (wad format).
-If set to empty, DoomGame will look for doom2.wad, DOOM2.WAD, and freedoom2.wad (in that order) in the working directory first and then in ViZDoom's installation directory
+If set to empty, DoomGame will look for doom2.wad, and freedoom2.wad (in that order) in the working directory first and then in ViZDoom's installation directory
 (where vizdoom library/pyd is).
+If the path is set and the file does not exist, ViZDoom will check if the file exists in the working directory and then in ViZDoom's installation directory.
 
 Default value: `""`
 
@@ -1472,7 +1438,7 @@ Config key: `screenFormat`/`screen_format`
 
 | C++    | `bool isDepthBufferEnabled()`       |
 | :--    | :--                                 |
-| Python | `is_depth_buffer_enabled() -> None` |
+| Python | `is_depth_buffer_enabled() -> bool` |
 
 Returns true if the depth buffer is enabled.
 
@@ -1506,7 +1472,7 @@ Note: added in 1.1.0.
 
 | C++    | `bool isLabelsBufferEnabled()`       |
 | :--    | :--                                  |
-| Python | `is_labels_buffer_enabled() -> None` |
+| Python | `is_labels_buffer_enabled() -> bool` |
 
 Returns true if the labels buffer is enabled.
 
@@ -1532,7 +1498,7 @@ Config key: `labelsBufferEnabled`/`labels_buffer_enabled`
 
 See also:
 - [`GameState`](./game_state.md#gamestate)
-- [examples/python/labels.py](https://github.com/Farama-Foundation/ViZDoom/tree/master/examples/python/labels.py)
+- [examples/python/labels_buffer.py](https://github.com/Farama-Foundation/ViZDoom/tree/master/examples/python/labels_buffer.py)
 - [examples/python/buffers.py](https://github.com/Farama-Foundation/ViZDoom/tree/master/examples/python/buffers.py)
 
 Note: added in 1.1.0.
