@@ -19,35 +19,30 @@ from utils import *
 # Q-learning settings
 learning_rate = 0.00025
 discount_factor = 0.99
-train_epochs = 5
-learning_steps_per_epoch = 2000
+train_epochs = 50 # 10 default
+learning_steps_per_epoch = 5000 # 2000 default
 replay_memory_size = 10000
 
 # NN learning settings
-batch_size = 64
+batch_size = 200 # 64 default; 256 too long; 128, 192 okay
 
 # Training regime
 test_episodes_per_epoch = 100
 
+# Configuration file path
+SCENARIO_NAME = "defend_the_center"
+config_file_path = os.path.join(SCENARIO_PATH, f"{SCENARIO_NAME}.cfg")
+
 # Other parameters
 frame_repeat = 12
-resolution = (30, 45)
+resolution = (96, 128)  # (30, 45) default; (96, 128) to keep aspect ratio
 episodes_to_watch = 10
 
-# model_savefile = "../models/q_late_fusion.pth"
-
 # Save to a new model file to not overwrite
-model_savefile = "../models/q_late_fusion_health_ammo_line.pth"
+model_savefile = f"../models/{SCENARIO_NAME}/q_late_fusion_gray_new.pth"
 save_model = True
 load_model = False
 skip_learning = False
-
-# Configuration file path
-# config_file_path = os.path.join(SCENARIO_PATH, "defend_the_center.cfg")
-
-# Train on the scenario that actually has both vars
-config_file_path = os.path.join(SCENARIO_PATH, "defend_the_line.cfg")
-
 
 # Uses GPU if available
 if torch.cuda.is_available():
@@ -56,8 +51,6 @@ if torch.cuda.is_available():
 else:
     DEVICE = torch.device("cpu")
 
-#GAME_VARS = [vzd.GameVariable.HEALTH, vzd.GameVariable.AMMO2,]
-
 # Make the variable order match the scenario
 GAME_VARS = [
     vzd.GameVariable.AMMO2,
@@ -65,8 +58,19 @@ GAME_VARS = [
 ]
 
 NUM_VARS = len(GAME_VARS)
-ARCH = "late_fusion"  # or "film"
 
+print("----------MODEL CONFIGURATION----------")
+print("DEVICE:", DEVICE)
+print("Learning Rate:", learning_rate)
+print("Discount Factor:", discount_factor)
+print("Train Epochs:", train_epochs)
+print("Learning Steps per Epoch:", learning_steps_per_epoch)
+print("Test Episodes per Epoch:", test_episodes_per_epoch)
+print("Replay Memory Size:", replay_memory_size)
+print("Batch Size:", batch_size)
+print("Frame Repeat:", frame_repeat)
+print("Resolution:", resolution)
+print("Episodes to Watch:", episodes_to_watch)
 
 def create_simple_game():
     print("Initializing doom...")
@@ -138,7 +142,7 @@ def run(game, agent, actions, num_epochs, frame_repeat, steps_per_epoch=2000):
                 next_img = preprocess(next_game_state.screen_buffer, resolution)
                 next_vars = preprocess_vars(next_game_state.game_variables, NUM_VARS)
             else:
-                next_img = np.zeros((1, 30, 45), dtype=np.float32)
+                next_img = np.zeros((1, resolution[0], resolution[1]), dtype=np.float32)
                 next_vars = np.zeros((NUM_VARS,), dtype=np.float32)
 
             agent.append_memory(state_img, state_vars, action, reward, next_img, next_vars, done)
@@ -177,7 +181,12 @@ class LateFusionDuelQNet(nn.Module):
     Late fusion: CNN(img) + MLP(vars) -> concat -> dueling head.
     Keeps your conv stack (same as current DuelQNet).
     """
-    def __init__(self, available_actions_count: int, num_vars: int):
+    def __init__(
+        self,
+        available_actions_count: int,
+        num_vars: int,
+        img_h: int = 96,
+        img_w: int = 128):
         super().__init__()
 
         # same conv backbone you already had
@@ -202,9 +211,14 @@ class LateFusionDuelQNet(nn.Module):
             nn.ReLU(),
         )
 
-        # NOTE: flattens to 192 for resolution (30,45)
+        # infer CNN output dim automatically
+        with torch.no_grad():
+            dummy = torch.zeros(1, 1, img_h, img_w)
+            x = self.conv4(self.conv3(self.conv2(self.conv1(dummy))))
+            conv_dim = x.view(1, -1).size(1)
+
         self.img_fc = nn.Sequential(
-            nn.Linear(192, 128),
+            nn.Linear(conv_dim, 128),
             nn.ReLU(),
         )
 
@@ -278,10 +292,12 @@ class DQNAgent:
             sd = torch.load(model_savefile, map_location=DEVICE)  # now this is a dict
 
             # TODO: may need to refactor to be compatible with FiLMDuelQNet
-            self.q_net = LateFusionDuelQNet(action_size, NUM_VARS).to(DEVICE)
+            self.q_net = LateFusionDuelQNet(
+                action_size, NUM_VARS, img_h=resolution[0], img_w=resolution[1]).to(DEVICE)
             self.q_net.load_state_dict(sd)
 
-            self.target_net = LateFusionDuelQNet(action_size, NUM_VARS).to(DEVICE)
+            self.target_net = LateFusionDuelQNet(
+                action_size, NUM_VARS,  img_h=resolution[0], img_w=resolution[1]).to(DEVICE)
             self.target_net.load_state_dict(sd)
 
             self.q_net.eval()
@@ -290,14 +306,12 @@ class DQNAgent:
 
         else:
             print("Initializing new model")
-            if ARCH == "late_fusion":
-                self.q_net = LateFusionDuelQNet(action_size, NUM_VARS).to(DEVICE)
-                self.target_net = LateFusionDuelQNet(action_size, NUM_VARS).to(DEVICE)
-            elif ARCH == "film":
-                self.q_net = FiLMDuelQNet(action_size, NUM_VARS).to(DEVICE)
-                self.target_net = FiLMDuelQNet(action_size, NUM_VARS).to(DEVICE)
-            else:
-                raise ValueError(f"Unknown ARCH: {ARCH}")
+            self.q_net = LateFusionDuelQNet(
+                action_size, NUM_VARS, img_h=resolution[0], img_w=resolution[1]).to(DEVICE)
+            self.target_net = LateFusionDuelQNet(
+                action_size, NUM_VARS, img_h=resolution[0], img_w=resolution[1]).to(DEVICE)
+            self.q_net.eval()
+            self.target_net.eval()
 
         self.opt = optim.Adam(self.q_net.parameters(), lr=self.lr)
 

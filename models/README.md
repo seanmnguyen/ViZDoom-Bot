@@ -114,17 +114,18 @@ python3 demo.py -mt ppo_cnn -mp ../models/defend_the_line/ppo_cnn_rgb.pth -s Tru
 
 - Architecture: QLateFusion --> CNN (screen buffer) + MLP (`AMMO2` and `HEALTH`)
 - Colors: GRAYSCALE
-- Training parameters: resolution=(30, 45), epochs=10, learning_steps_per_epoch=2000, batch_size=64
+- Training parameters: resolution=(96, 128), epochs=50, learning_steps_per_epoch=5000, batch_size=200
 - Earlier versions:
   - q_late_fusion_gray.pth 
   - q_late_fusion_gray2.pth
-- Performance: Average Score = 3.3
+  - q_late_fusion_gray3.pth
+- Performance: Average Score = 7.1
 - Trainer: Sean Nguyen
 
 Demo: 
 
 ```
-python3 demo.py -mt q_late_fusion -mp ../models/defend_the_center/q_late_fusion_gray_best.pth -s True -sc defend_the_center.cfg
+python3 demo.py -mt q_late_fusion -mp ../models/defend_the_center/q_late_fusion_gray_new.pth -s True -sc defend_the_center.cfg
 ```
 
 #### q_late_fusion_rgb_best.pth
