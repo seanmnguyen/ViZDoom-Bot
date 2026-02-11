@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
             print(
                 f"State #{state.number} | "
-                f"Vars: {state.game_variables} | "
+                f"Game variables: {state.game_variables} | "
                 f"Action: {last_action} | "
                 f"Reward: {reward}"
             )

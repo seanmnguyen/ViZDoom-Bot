@@ -177,7 +177,7 @@ def main(args):
 if __name__ == "__main__":
     parser = ArgumentParser("Train stable-baselines3 PPO agents on ViZDoom.")
     parser.add_argument(
-        "--env",
+        dest="env",
         default=DEFAULT_ENV,
         choices=AVAILABLE_ENVS,
         help="Name of the environment to play",

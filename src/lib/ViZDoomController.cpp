@@ -1252,11 +1252,15 @@ namespace vizdoom {
                                                  + " | " + sharedFreedoom2Path);
         }
         else {
-            bool iwadPathContainsParent = bal::contains(this->iwadPath, "/") || bal::contains(this->iwadPath, "\\");
-            if (!iwadPathContainsParent && !fileExists(this->iwadPath)) {
-                std::string sharedIwadPath = getThisSharedObjectPath() + "/" + this->iwadPath;
-                if (fileExists(sharedIwadPath) || (!hasExtension(sharedIwadPath) && fileExists(sharedIwadPath + ".wad")))
-                    this->iwadPath = sharedIwadPath;
+            if (!fileExists(this->iwadPath)) {
+                std::string iwadBaseName = bfs::path(this->iwadPath).filename().string();
+                std::string workingBaseIwadPath = "./" + iwadBaseName;
+                std::string sharedBaseIwadPath = getThisSharedObjectPath() + "/" + iwadBaseName;
+
+                if (fileExists(workingBaseIwadPath) || (!hasExtension(workingBaseIwadPath) && fileExists(workingBaseIwadPath + ".wad")))
+                    this->iwadPath = workingBaseIwadPath;
+                else if (fileExists(sharedBaseIwadPath) || (!hasExtension(sharedBaseIwadPath) && fileExists(sharedBaseIwadPath + ".wad")))
+                    this->iwadPath = sharedBaseIwadPath;
             }
         }
 

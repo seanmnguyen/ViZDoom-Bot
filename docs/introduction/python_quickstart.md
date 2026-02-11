@@ -86,3 +86,17 @@ Please note that the Windows version is not as well-tested as Linux and macOS ve
 It can be used for development and testing but if you want to conduct serious (time and resource-extensive) experiments on Windows,
 please consider using [Docker](https://docs.docker.com/docker-for-windows/install/) or [WSL](https://docs.microsoft.com/en-us/windows/wsl) with Linux version.
 Windows version is bundled with OpenAL library, so you don't need to install it separately.
+
+
+## Installing original Doom's assets
+If you own original Doom or/and Doom 2 game (can purchase them on purchasing them on [Steam](https://store.steampowered.com/app/2280/DOOM__DOOM_II/) or [GOG](https://www.gog.com/game/doom_doom_ii)), you can install them to ViZDoom by placing doom2.wad and doom.wad into your working directory or vizdoom package directory (same directory as vizdoom(.exe)). You can install an IWAD into the package location with one of these one-line commands:
+
+Python only:
+```{code-block} sh
+python -c 'import os,shutil,sys,vizdoom; src=sys.argv[1]; dst=os.path.join(vizdoom.install_path, os.path.basename(src).lower()); shutil.copy2(src,dst);' /path/to/file.wad
+```
+
+Python + shell:
+```{code-block} sh
+src=/path/to/file.wad; dst_dir="$(python -c 'import vizdoom; print(vizdoom.install_path)')"; cp "$src" "$dst_dir/$(basename "${src,,}")"
+```

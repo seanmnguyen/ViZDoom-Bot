@@ -4,7 +4,22 @@ Beside the custom scenarios (original ViZDoom nomenclature)/environments (Gymnas
 
 Because we cannot provide original Doom's and Doom's 2 levels, in order to play them you need to have original Doom or Doom 2 WAD files.
 You can get them by purchasing the original game from [Steam](https://store.steampowered.com/app/2280/DOOM__DOOM_II/) or [GOG](https://www.gog.com/game/doom_doom_ii).
-You can then place the doom2.wad and doom.wad files into your vizdoom package directory (same directory as vizdoom(.exe)).
+You can then place the doom2.wad and doom.wad files into your vizdoom package root directory (same directory as vizdoom(.exe)).
+You can install an IWAD into the package location with one of the following one-line commands:
+
+Python only:
+```{code-block} sh
+python -c 'import os,shutil,sys,vizdoom; src=sys.argv[1]; dst=os.path.join(vizdoom.install_path, os.path.basename(src).lower()); shutil.copy2(src,dst);' /path/to/file.wad
+```
+
+Python + shell:
+```{code-block} sh
+src=/path/to/file.wad; dst_dir="$(python -c 'import vizdoom; print(vizdoom.install_path)')"; cp "$src" "$dst_dir/$(basename "${src,,}")"
+```
+
+ViZDoom expects doom2.wad and doom.wad files to be in lowercase (they are sometimes distrubited with uppercased names).
+ViZDoom will autodetect `doom2.wad` filename installed in the package root directory without need to set `DoomGame.set_doom_game_path`.
+It will also automatically look for other IWAD files in the package root directory.
 
 ## Configuration
 
