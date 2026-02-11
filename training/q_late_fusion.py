@@ -34,13 +34,20 @@ frame_repeat = 12
 resolution = (30, 45)
 episodes_to_watch = 10
 
-model_savefile = "../models/q_late_fusion.pth"
+# model_savefile = "../models/q_late_fusion.pth"
+
+# Save to a new model file to not overwrite
+model_savefile = "../models/q_late_fusion_health_ammo_line.pth"
 save_model = True
 load_model = False
 skip_learning = False
 
 # Configuration file path
-config_file_path = os.path.join(SCENARIO_PATH, "defend_the_center.cfg")
+# config_file_path = os.path.join(SCENARIO_PATH, "defend_the_center.cfg")
+
+# Train on the scenario that actually has both vars
+config_file_path = os.path.join(SCENARIO_PATH, "defend_the_line.cfg")
+
 
 # Uses GPU if available
 if torch.cuda.is_available():
@@ -49,10 +56,14 @@ if torch.cuda.is_available():
 else:
     DEVICE = torch.device("cpu")
 
+#GAME_VARS = [vzd.GameVariable.HEALTH, vzd.GameVariable.AMMO2,]
+
+# Make the variable order match the scenario
 GAME_VARS = [
-    vzd.GameVariable.HEALTH,
     vzd.GameVariable.AMMO2,
+    vzd.GameVariable.HEALTH,
 ]
+
 NUM_VARS = len(GAME_VARS)
 ARCH = "late_fusion"  # or "film"
 
