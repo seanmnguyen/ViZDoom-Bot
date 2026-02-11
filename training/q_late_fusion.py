@@ -51,13 +51,7 @@ if torch.cuda.is_available():
 else:
     DEVICE = torch.device("cpu")
 
-# Make the variable order match the scenario
-GAME_VARS = [
-    vzd.GameVariable.AMMO2,
-    vzd.GameVariable.HEALTH,
-]
-
-NUM_VARS = len(GAME_VARS)
+NUM_VARS = get_num_game_variables(config_file_path)
 
 print("----------MODEL CONFIGURATION----------")
 print("DEVICE:", DEVICE)
@@ -80,7 +74,7 @@ def create_simple_game():
     game.set_mode(vzd.Mode.PLAYER)
     game.set_screen_format(vzd.ScreenFormat.GRAY8)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
-    for gv in GAME_VARS:
+    for gv in game.get_available_game_variables():
         game.add_available_game_variable(gv)
     game.init()
     print("Doom initialized.")

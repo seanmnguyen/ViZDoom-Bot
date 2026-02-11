@@ -2,6 +2,7 @@
 
 import numpy as np
 import skimage.transform
+import vizdoom as vzd
 
 SCENARIO_PATH = "../scenarios/"
 
@@ -38,3 +39,10 @@ def preprocess_rgb(img, resolution=(96, 128)):
     ).astype(np.float32)
     x = np.transpose(x, (2, 0, 1))  # -> C,H,W
     return x
+
+def get_num_game_variables(scenario_path: str):
+    game = vzd.DoomGame()
+    game.load_config(scenario_path)
+    num_game_variables = game.get_available_game_variables_size()
+    game.close()
+    return num_game_variables

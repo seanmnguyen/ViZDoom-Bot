@@ -51,11 +51,7 @@ if torch.cuda.is_available():
 else:
     DEVICE = torch.device("cpu")
 
-GAME_VARS = [
-    vzd.GameVariable.HEALTH,
-    vzd.GameVariable.AMMO2,
-]
-NUM_VARS = len(GAME_VARS)
+NUM_VARS = get_num_game_variables(config_file_path)
 
 print("----------MODEL CONFIGURATION----------")
 print("DEVICE:", DEVICE)
@@ -78,7 +74,7 @@ def create_simple_game():
     game.set_mode(vzd.Mode.PLAYER)
     game.set_screen_format(vzd.ScreenFormat.RGB24)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
-    for gv in GAME_VARS:
+    for gv in game.get_available_game_variables():
         game.add_available_game_variable(gv)
     game.init()
     print("Doom initialized.")
@@ -481,6 +477,7 @@ if __name__ == "__main__":
     game = create_simple_game()
     n = game.get_available_buttons_size()
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
+
 
     # Initialize our agent with the set parameters
     agent = DQNAgent(
