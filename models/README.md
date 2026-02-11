@@ -125,7 +125,7 @@ python3 demo.py -mt ppo_cnn -mp ../models/defend_the_line/ppo_cnn_rgb.pth -s Tru
 Demo: 
 
 ```
-python3 demo.py -mt q_late_fusion -mp ../models/defend_the_center/q_late_fusion_gray_new.pth -s True -sc defend_the_center.cfg
+python3 demo.py -mt q_late_fusion -mp ../models/defend_the_center/q_late_fusion_gray_best.pth -s True -sc defend_the_center.cfg
 ```
 
 #### q_late_fusion_rgb_best.pth
