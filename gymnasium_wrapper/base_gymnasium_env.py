@@ -2,10 +2,34 @@
 Implementation of the base Gymnasium environment for ViZDoom.
 
 The first version was based on Gym interface by [Simon Hakenes](https://github.com/shakenes/vizdoomgym),
-and developed by [Arjun KG](https://github.com/arjun-kg),
+and developed by
+[Arjun KG](https://github.com/arjun-kg),
 [Benjamin Noah Beal](https://github.com/bebeal),
 [Lawrence Francis](https://github.com/ldfrancis),
-and [Mark Towers](https://github.com/pseudo-rnd-thoughts).
+[Mark Towers](https://github.com/pseudo-rnd-thoughts).
+
+Modified and updated by
+[Muhammad Elnimr](https://github.com/melnimr),
+[Hugo Huang](https://github.com/Trenza1ore),
+[Marek Wydmuch](https://github.com/mwydmuch).
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 """
 
 import itertools
@@ -27,6 +51,8 @@ import vizdoom.vizdoom as vzd
 LABEL_COLORS = (
     np.random.default_rng(42).uniform(25, 256, size=(256, 3)).astype(np.uint8)
 )
+
+ASCII_CHARS = [chr(i) for i in range(0, 127)]
 
 
 class VizdoomEnv(gym.Env, EzPickle):
@@ -121,18 +147,41 @@ class VizdoomEnv(gym.Env, EzPickle):
         if config_file is None and not kwargs:
             raise RuntimeError("Either config_file or kwargs must be provided.")
 
-        self.game.set_window_visible(False)
-        self.game.set_audio_buffer_size(frame_skip)
-        self.game.set_notifications_buffer_size(frame_skip)
+        if (
+            kwargs is None or "window_visible" not in kwargs
+        ):  # Gymnasium environments should not create a visible window by default, but allow users to override this in kwargs
+            self.game.set_window_visible(False)
+
+        if (
+            kwargs is None or "audio_buffer_size" not in kwargs
+        ):  # Gymnasium environments should have buffer size set to frame_skip for all buffers by default, but allow users to override this in kwargs
+            self.game.set_audio_buffer_size(frame_skip)
+        elif self.game.is_audio_buffer_enabled():
+            warnings.warn(
+                "audio_buffer_size is set in kwargs. Gymnasium wrapper sets this buffer size to frame_skip by default."
+            )
+
+        if (
+            kwargs is None or "notifications_buffer_size" not in kwargs
+        ):  # Gymnasium environments should have buffer size set to frame_skip for all buffers by default, but allow users to override this in kwargs
+            self.game.set_notifications_buffer_size(frame_skip)
+        elif self.game.is_notifications_buffer_enabled():
+            warnings.warn(
+                "notifications_buffer_size is set in kwargs. Gymnasium wrapper sets this buffer size to frame_skip by default."
+            )
+
         screen_format = self.game.get_screen_format()
         if (
             screen_format != vzd.ScreenFormat.RGB24
             and screen_format != vzd.ScreenFormat.GRAY8
         ):
-            warnings.warn(
-                f"Detected screen format {screen_format.name}. Only RGB24 and GRAY8 are supported in the Gymnasium"
-                f" wrapper. Forcing RGB24."
-            )
+            if (
+                kwargs is not None and "screen_format" in kwargs
+            ):  # Only warn if user explicitly set screen_format in kwargs
+                warnings.warn(
+                    f"Detected screen format {screen_format.name} set in kwargs. "
+                    f"Only RGB24 and GRAY8 are supported in the Gymnasium wrapper. Forcing RGB24."
+                )
             self.game.set_screen_format(vzd.ScreenFormat.RGB24)
 
         self.state = None
@@ -496,7 +545,9 @@ class VizdoomEnv(gym.Env, EzPickle):
                 dtype=np.int16,
             )
         if self.notifications:
-            spaces["notifications"] = gym.spaces.Text(min_length=0, max_length=32768)
+            spaces["notifications"] = gym.spaces.Text(
+                min_length=0, max_length=32768, charset=ASCII_CHARS
+            )
 
         self.num_game_variables = self.game.get_available_game_variables_size()
         if self.num_game_variables > 0:
