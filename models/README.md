@@ -110,7 +110,7 @@ python3 demo.py -mt ppo_cnn -mp ../models/defend_the_line/ppo_cnn_rgb.pth -s Tru
 
 ### Q-Learning
 
-#### q_late_fusion_gray2.pth
+#### q_late_fusion_gray_best.pth
 
 - Architecture: QLateFusion --> CNN (screen buffer) + MLP (`AMMO2` and `HEALTH`)
 - Colors: GRAYSCALE
