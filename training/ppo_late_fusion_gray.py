@@ -26,13 +26,13 @@ learning_rate   = 3e-4
 gamma           = 0.99    # discount factor
 gae_lambda      = 0.95    # GAE-λ for advantage estimation
 clip_epsilon    = 0.2     # PPO clipping parameter
-entropy_coef    = 0.01    # entropy bonus (exploration)
+entropy_coef    = 0.05    # entropy bonus (exploration)
 value_coef      = 0.5     # value-loss weight
 max_grad_norm   = 0.5     # gradient clipping
 
 # Training regime
-train_epochs            = 10
-steps_per_epoch         = 2048   # rollout length before each PPO update
+train_epochs            = 5
+steps_per_epoch         = 4096   # rollout length before each PPO update
 ppo_epochs              = 4      # optimisation passes per rollout
 mini_batch_size         = 64
 test_episodes_per_epoch = 100
