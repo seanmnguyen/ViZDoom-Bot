@@ -10,6 +10,7 @@ import os
 from time import sleep, time
 
 import numpy as np
+import skimage.transform
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -17,7 +18,7 @@ from torch.distributions import Categorical
 from tqdm import trange
 
 import vizdoom as vzd
-from utils import preprocess, SCENARIO_PATH
+from utils import SCENARIO_PATH
 
 
 # ── Hyperparameters ───────────────────────────────────────────────────────────
@@ -43,7 +44,7 @@ resolution        = (30, 45)   # (H, W) after preprocessing
 episodes_to_watch = 10
 
 # Persistence
-model_savefile = "../models/defeind_the_line/ppo_late_fusion_rgb.pth"
+model_savefile = "../models/ppo_late_fusion_rgb.pth"
 save_model     = True
 load_model     = False
 skip_learning  = False
@@ -55,6 +56,19 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if torch.cuda.is_available():
     torch.backends.cudnn.benchmark = True
 print(f"Using device: {DEVICE}")
+
+
+# ── Preprocessing ─────────────────────────────────────────────────────────────
+
+def preprocess_rgb(frame, resolution):
+    """
+    Resize RGB frame and move channels to front.
+    Input:  (H, W, 3)  uint8
+    Output: (3, H, W)  float32
+    """
+    frame = skimage.transform.resize(frame, resolution, anti_aliasing=True)
+    frame = np.transpose(frame, (2, 0, 1))  # (H, W, 3) → (3, H, W)
+    return frame.astype(np.float32)
 
 
 # ── Game setup ────────────────────────────────────────────────────────────────
@@ -329,7 +343,7 @@ def test(game, agent, actions, num_episodes: int = 10):
     for _ in trange(num_episodes, leave=False):
         game.new_episode()
         while not game.is_episode_finished():
-            state  = preprocess(game.get_state().screen_buffer, resolution)
+            state  = preprocess_rgb(game.get_state().screen_buffer, resolution)
             action = agent.get_action(state, deterministic=True)
             game.make_action(actions[action], frame_repeat)
         scores.append(game.get_total_reward())
@@ -356,7 +370,7 @@ def run(game, agent, actions, num_epochs, steps_per_epoch, frame_repeat):
         episode_reward = 0.0
 
         for _ in trange(steps_per_epoch, desc="Collecting rollout", leave=False):
-            state  = preprocess(game.get_state().screen_buffer, resolution)
+            state  = preprocess_rgb(game.get_state().screen_buffer, resolution)
             action, log_prob, value = agent.get_action(state)
 
             reward = game.make_action(actions[action], frame_repeat)
@@ -441,7 +455,7 @@ if __name__ == "__main__":
         while not game.is_episode_finished():
             gs = game.get_state()
             assert gs is not None
-            state  = preprocess(gs.screen_buffer, resolution)
+            state  = preprocess_rgb(gs.screen_buffer, resolution)
             action = agent.get_action(state, deterministic=True)
             game.set_action(actions[action])
             for _ in range(frame_repeat):
