@@ -1,6 +1,3 @@
-Ppo late fusion rgb · PY
-Copy
-
 #!/usr/bin/env python3
 
 """
