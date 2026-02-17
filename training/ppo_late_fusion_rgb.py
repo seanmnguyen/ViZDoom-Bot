@@ -44,7 +44,7 @@ resolution        = (30, 45)   # (H, W) after preprocessing
 episodes_to_watch = 10
 
 # Persistence
-model_savefile = "../models/ppo_late_fusion_rgb.pth"
+model_savefile = "../models/defend_the_line/ppo_late_fusion_rgb.pth"
 save_model     = True
 load_model     = True
 skip_learning  = True
