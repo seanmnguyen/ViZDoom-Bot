@@ -417,7 +417,16 @@ def run(game, agent, actions, num_epochs, steps_per_epoch, frame_repeat):
 if __name__ == "__main__":
     game    = create_simple_game()
     n       = game.get_available_buttons_size()
-    actions = [list(a) for a in it.product([0, 1], repeat=n)]
+    actions = [
+    [0, 0, 0, 0, 0],  # do nothing
+    [1, 0, 0, 0, 0],  # turn left
+    [0, 1, 0, 0, 0],  # turn right
+    [0, 0, 1, 0, 0],  # attack
+    [1, 0, 1, 0, 0],  # turn left + attack
+    [0, 1, 1, 0, 0],  # turn right + attack
+    [0, 0, 0, 1, 0],  # move left
+    [0, 0, 0, 0, 1],  # move right
+    ]
     print(f"Action space size: {len(actions)}")
 
     agent = PPOAgent(
