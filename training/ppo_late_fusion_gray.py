@@ -45,8 +45,8 @@ episodes_to_watch = 10
 # Persistence
 model_savefile = "../models/ppo_late_fusion_gray.pth"
 save_model     = True
-load_model     = False
-skip_learning  = False
+load_model     = True
+skip_learning  = True
 
 config_file_path = os.path.join(SCENARIO_PATH, "defend_the_line.cfg")
 print(config_file_path)
