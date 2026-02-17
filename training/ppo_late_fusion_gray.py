@@ -31,7 +31,7 @@ value_coef      = 0.5     # value-loss weight
 max_grad_norm   = 0.5     # gradient clipping
 
 # Training regime
-train_epochs            = 5
+train_epochs            = 20
 steps_per_epoch         = 4096   # rollout length before each PPO update
 ppo_epochs              = 4      # optimisation passes per rollout
 mini_batch_size         = 64
@@ -45,8 +45,8 @@ episodes_to_watch = 10
 # Persistence
 model_savefile = "../models/ppo_late_fusion_gray.pth"
 save_model     = True
-load_model     = True
-skip_learning  = True
+load_model     = False
+skip_learning  = False
 
 config_file_path = os.path.join(SCENARIO_PATH, "defend_the_line.cfg")
 print(config_file_path)
