@@ -2,6 +2,7 @@
 
 import itertools as it
 import os
+from collections import deque
 from time import sleep, time
 
 import numpy as np
@@ -24,9 +25,12 @@ entropy_coef = 0.01  # entropy bonus coefficient
 value_coef = 0.5  # value loss coefficient
 max_grad_norm = 0.5  # gradient clipping
 
+# Frame stacking
+FRAME_STACK_SIZE = 4  # number of consecutive frames stacked as input channels
+
 # Training settings
-train_epochs = 10
-steps_per_epoch = 2048  # steps to collect before each update
+train_epochs = 30
+steps_per_epoch = 4096  # steps to collect before each update
 ppo_epochs = 4  # number of PPO update epochs per batch
 mini_batch_size = 64  # mini-batch size for PPO updates
 
@@ -85,9 +89,9 @@ class ActorCriticCNN(nn.Module):
     def __init__(self, action_size):
         super().__init__()
 
-        # Shared convolutional backbone
+        # Shared convolutional backbone (input channels = FRAME_STACK_SIZE)
         self.conv1 = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(FRAME_STACK_SIZE, 32, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
         )
         self.conv2 = nn.Sequential(
@@ -100,7 +104,7 @@ class ActorCriticCNN(nn.Module):
         )
 
         # Calculate the size of flattened features
-        # Input: (1, 96, 128) -> after convs: (64, 12, 16)
+        # Input: (FRAME_STACK_SIZE, 96, 128) -> after convs: (64, 12, 16)
         self.feature_size = 64 * 12 * 16
 
         # Shared fully connected layer
@@ -175,6 +179,30 @@ class ActorCriticCNN(nn.Module):
         """Get only the value estimate (used for GAE computation)."""
         features = self.forward(x)
         return self.critic(features).squeeze(-1)
+
+
+class FrameStack:
+    """Maintains a stack of recent frames for temporal context."""
+
+    def __init__(self, stack_size, frame_shape):
+        self.stack_size = stack_size
+        self.frame_shape = frame_shape  # (H, W) for grayscale
+        self.frames = deque(maxlen=stack_size)
+        self.reset()
+
+    def reset(self):
+        """Fill the stack with zeros."""
+        self.frames.clear()
+        for _ in range(self.stack_size):
+            self.frames.append(np.zeros(self.frame_shape, dtype=np.float32))
+
+    def push(self, frame):
+        """Add a new frame. `frame` shape: (1, H, W) from preprocess."""
+        self.frames.append(frame[0])  # strip channel dim -> (H, W)
+
+    def get(self):
+        """Return stacked frames as (FRAME_STACK_SIZE, H, W)."""
+        return np.array(self.frames, dtype=np.float32)
 
 
 class RolloutBuffer:
@@ -340,7 +368,7 @@ class PPOAgent:
         """
         # Get last value for GAE
         last_state = self.buffer.states[-1] if self.buffer.states else np.zeros(
-            (1, *resolution))
+            (FRAME_STACK_SIZE, *resolution))
         last_value = self.get_last_value(
             last_state) if not self.buffer.dones[-1] else 0.0
 
@@ -430,11 +458,15 @@ def test(game, agent, actions, num_episodes=100):
     """Run test episodes and report results."""
     print("\nTesting...")
     test_scores = []
+    frame_stack = FrameStack(FRAME_STACK_SIZE, resolution)
 
     for _ in trange(num_episodes, leave=False):
         game.new_episode()
+        frame_stack.reset()
         while not game.is_episode_finished():
-            state = preprocess(game.get_state().screen_buffer, resolution)
+            frame = preprocess(game.get_state().screen_buffer, resolution)
+            frame_stack.push(frame)
+            state = frame_stack.get()
             action = agent.get_action(state, deterministic=True)
             game.make_action(actions[action], frame_repeat)
         test_scores.append(game.get_total_reward())
@@ -456,18 +488,23 @@ def run(game, agent, actions, num_epochs, steps_per_epoch, frame_repeat):
     start_time = time()
     best_mean_reward = float("-inf")
 
+    frame_stack = FrameStack(FRAME_STACK_SIZE, resolution)
+
     for epoch in range(num_epochs):
         print(f"\n{'='*50}")
         print(f"Epoch #{epoch + 1}")
         print(f"{'='*50}")
 
         game.new_episode()
+        frame_stack.reset()
         train_scores = []
         episode_reward = 0
 
         # Collect rollout
         for step in trange(steps_per_epoch, desc="Collecting rollout", leave=False):
-            state = preprocess(game.get_state().screen_buffer, resolution)
+            frame = preprocess(game.get_state().screen_buffer, resolution)
+            frame_stack.push(frame)
+            state = frame_stack.get()
             action, log_prob, value = agent.get_action(state)
 
             reward = game.make_action(actions[action], frame_repeat)
@@ -481,6 +518,7 @@ def run(game, agent, actions, num_epochs, steps_per_epoch, frame_repeat):
                 train_scores.append(episode_reward)
                 episode_reward = 0
                 game.new_episode()
+                frame_stack.reset()
 
         # PPO update
         stats = agent.train()
@@ -559,13 +597,17 @@ if __name__ == "__main__":
     game.set_mode(vzd.Mode.ASYNC_PLAYER)
     game.init()
 
+    frame_stack = FrameStack(FRAME_STACK_SIZE, resolution)
     total_score = 0
     for episode_num in range(episodes_to_watch):
         game.new_episode()
+        frame_stack.reset()
         while not game.is_episode_finished():
             game_state = game.get_state()
             assert game_state is not None
-            state = preprocess(game_state.screen_buffer, resolution)
+            frame = preprocess(game_state.screen_buffer, resolution)
+            frame_stack.push(frame)
+            state = frame_stack.get()
             action = agent.get_action(state, deterministic=True)
 
             game.set_action(actions[action])

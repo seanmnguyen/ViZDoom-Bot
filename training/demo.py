@@ -18,6 +18,7 @@ from q_cnn import DQNAgent as DQNAgent_CNN
 from q_cnn_rgb import DQNAgent as DQNAgent_CNNRGB
 from ppo_cnn import PPOAgent
 from ppo_cnn_gray import PPOAgent as PPOAgent_Gray
+from ppo_cnn_gray import FrameStack, FRAME_STACK_SIZE
 
 # ---------- GLOBALS ----------
 # Just necessary for building the agent, can mostly ignore
@@ -86,6 +87,9 @@ COLOR_BY_MODEL = {
 
 # PPO model interface
 PPO_MODELS = {"ppo_cnn", "ppo_cnn_gray"}
+
+# Models that use frame stacking
+FRAME_STACK_MODELS = {"ppo_cnn_gray"}
 
 
 # ---------- CLI PARSER ----------
@@ -215,16 +219,28 @@ if __name__ == "__main__":
             model_weights=model_path,
         )
 
+    # Set up frame stacking if needed
+    use_frame_stack = args.model_type in FRAME_STACK_MODELS
+    if use_frame_stack:
+        frame_stack = FrameStack(FRAME_STACK_SIZE, resolution)
+
     # Play episode with model
     total_score = 0
     for episode_num in range(EPISODES_TO_WATCH):
         game.new_episode()
+        if use_frame_stack:
+            frame_stack.reset()
         while not game.is_episode_finished():
             game_state = game.get_state()
             assert game_state is not None
             state_img = preprocess(game_state.screen_buffer, resolution)
             state_vars = preprocess_vars(game_state.game_variables, len(
                 game.get_available_game_variables()))
+
+            # Apply frame stacking if needed
+            if use_frame_stack:
+                frame_stack.push(state_img)
+                state_img = frame_stack.get()
 
             # PPO agents use deterministic=True for evaluation
             if args.model_type in PPO_MODELS:
