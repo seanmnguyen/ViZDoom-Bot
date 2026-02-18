@@ -17,6 +17,7 @@ from q_late_fusion_rgb import DQNAgent as DQNAgent_LateFusionRGB
 from q_cnn import DQNAgent as DQNAgent_CNN
 from q_cnn_rgb import DQNAgent as DQNAgent_CNNRGB
 from ppo_cnn import PPOAgent
+from ppo_cnn_gray import PPOAgent as PPOAgent_Gray
 
 # ---------- GLOBALS ----------
 # Just necessary for building the agent, can mostly ignore
@@ -48,6 +49,7 @@ MODEL_DEFAULT_SCENARIO = {
     "q_late_fusion": "defend_the_center.cfg",
     "q_late_fusion_rgb": "defend_the_center.cfg",
     "ppo_cnn": "defend_the_line.cfg",
+    "ppo_cnn_gray": "defend_the_center.cfg",
 }
 
 # Map model type -> agent class
@@ -57,6 +59,7 @@ AGENT_BY_MODEL = {
     "q_late_fusion": DQNAgent_LateFusion,
     "q_late_fusion_rgb": DQNAgent_LateFusionRGB,
     "ppo_cnn": PPOAgent,
+    "ppo_cnn_gray": PPOAgent_Gray,
 }
 
 # Map model type -> resolution (for preprocessing)
@@ -66,6 +69,7 @@ RESOLUTION_BY_MODEL = {
     "q_late_fusion": (30, 45),
     "q_late_fusion_rgb": (96, 128),
     "ppo_cnn": (30, 45),
+    "ppo_cnn_gray": (96, 128),
 }
 
 # Map model type -> RGB or grayscale
@@ -77,10 +81,11 @@ COLOR_BY_MODEL = {
     "q_late_fusion": GRAYSCALE,
     "q_late_fusion_rgb": RGB,
     "ppo_cnn": GRAYSCALE,
+    "ppo_cnn_gray": GRAYSCALE,
 }
 
 # PPO model interface
-PPO_MODELS = {"ppo_cnn"}
+PPO_MODELS = {"ppo_cnn", "ppo_cnn_gray"}
 
 
 # ---------- CLI PARSER ----------

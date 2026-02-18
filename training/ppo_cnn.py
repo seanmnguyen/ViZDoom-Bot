@@ -1,16 +1,5 @@
 #!/usr/bin/env python3
 
-"""
-PPO (Proximal Policy Optimization) training script for ViZDoom.
-This replaces the Q-learning approach with an actor-critic policy gradient method.
-
-PPO offers several advantages over DQN:
-- Works with continuous and discrete action spaces
-- More stable training via clipped objective
-- Better sample efficiency through importance sampling
-- Natural handling of stochastic policies
-"""
-
 import itertools as it
 import os
 from time import sleep, time
