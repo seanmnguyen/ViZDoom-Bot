@@ -69,7 +69,7 @@ RESOLUTION_BY_MODEL = {
     "q_late_fusion": (96, 128),
     "q_late_fusion_rgb": (96, 128),
     "ppo_cnn": (30, 45),
-    "ppo_cnn_gray": "defend_the_center.cfg",
+    "ppo_cnn_gray": (96, 128),
     "q_late_fusion_rgb_DC": (96, 128),
     "q_rainbow_rgb": (96, 128),
 }
@@ -82,11 +82,16 @@ COLOR_BY_MODEL = {
     "q_late_fusion": GRAYSCALE,
     "q_late_fusion_rgb": RGB,
     "ppo_cnn": GRAYSCALE,
+    "ppo_cnn_gray": GRAYSCALE,
     "q_late_fusion_rgb_DC": RGB,
     "q_rainbow_rgb": RGB,
 }
 
-PPO_MODELS = {"ppo_cnn"}
+# PPO model interface
+PPO_MODELS = {"ppo_cnn", "ppo_cnn_gray"}
+
+# Models that use frame stacking
+FRAME_STACK_MODELS = {"ppo_cnn_gray"}
 
 
 # ---------- CLI PARSER (demo.py-compatible) ----------
@@ -165,7 +170,7 @@ def infer_expected_num_vars(agent, game: vzd.DoomGame) -> int:
 
 
 @torch.no_grad()
-def evaluate(game: vzd.DoomGame, agent, actions, *, model_type: str, resolution, episodes: int, visible_window: bool):
+def evaluate(game: vzd.DoomGame, agent, actions, *, model_type: str, resolution, episodes: int, visible_window: bool, use_frame_stack: bool, frame_stack):
     # Set eval mode if supported
     if hasattr(agent, "set_eval_mode"):
         agent.set_eval_mode()
@@ -181,12 +186,20 @@ def evaluate(game: vzd.DoomGame, agent, actions, *, model_type: str, resolution,
     for ep in range(episodes):
         game.new_episode()
 
+        if use_frame_stack:
+            frame_stack.reset()
+
         while not game.is_episode_finished():
             gs = game.get_state()
             if gs is None:
                 break
 
             state_img = preprocess_fn(gs.screen_buffer, resolution)
+
+            # Apply frame stacking if needed
+            if use_frame_stack:
+                frame_stack.push(state_img)
+                state_img = frame_stack.get()
 
             if model_type in PPO_MODELS:
                 a = agent.get_action(state_img, deterministic=True)
@@ -282,6 +295,13 @@ if __name__ == "__main__":
             model_weights=model_path,
         )
 
+    # Set up frame stacking if needed
+    use_frame_stack = args.model_type in FRAME_STACK_MODELS
+    if use_frame_stack:
+        frame_stack = FrameStack(FRAME_STACK_SIZE, resolution)
+    else:
+        frame_stack = None
+
     # Evaluate
     scores = evaluate(
         game,
@@ -291,6 +311,8 @@ if __name__ == "__main__":
         resolution=resolution,
         episodes=args.episodes,
         visible_window=visible_window,
+        use_frame_stack=use_frame_stack,
+        frame_stack=frame_stack,
     )
 
     print("======================================")
