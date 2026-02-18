@@ -20,18 +20,18 @@ from utils import *
 # Q-learning settings
 learning_rate = 0.00025
 discount_factor = 0.99
-train_epochs = 10 # 10 default
+train_epochs = 20 # 10 default
 learning_steps_per_epoch = 2000 # 2000 default
 replay_memory_size = 10000
 
 # NN learning settings
-batch_size = 64 # 64 default; 256 too long; 128, 192 okay
+batch_size = 128 # 64 default; 256 too long; 128, 192 okay
 
 # Training regime
 test_episodes_per_epoch = 100
 
 # Configuration file path
-SCENARIO_NAME = "defend_the_line"
+SCENARIO_NAME = "defend_the_center"
 config_file_path = os.path.join(SCENARIO_PATH, f"{SCENARIO_NAME}.cfg")
 
 # Other parameters
@@ -52,19 +52,6 @@ else:
     DEVICE = torch.device("cpu")
 
 NUM_VARS = get_num_game_variables(config_file_path)
-
-print("----------MODEL CONFIGURATION----------")
-print("DEVICE:", DEVICE)
-print("Learning Rate:", learning_rate)
-print("Discount Factor:", discount_factor)
-print("Train Epochs:", train_epochs)
-print("Learning Steps per Epoch:", learning_steps_per_epoch)
-print("Test Episodes per Epoch:", test_episodes_per_epoch)
-print("Replay Memory Size:", replay_memory_size)
-print("Batch Size:", batch_size)
-print("Frame Repeat:", frame_repeat)
-print("Resolution:", resolution)
-print("Episodes to Watch:", episodes_to_watch)
 
 def create_simple_game():
     print("Initializing doom...")
@@ -470,9 +457,10 @@ class DQNAgent:
         self.target_net.eval()
         self.epsilon = 0.0
 
-
-
 if __name__ == "__main__":
+    print_config(DEVICE, learning_rate, discount_factor, train_epochs, learning_steps_per_epoch, test_episodes_per_epoch,
+        replay_memory_size, batch_size, frame_repeat, resolution, episodes_to_watch)
+
     # Initialize game and actions
     game = create_simple_game()
     n = game.get_available_buttons_size()

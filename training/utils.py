@@ -66,3 +66,29 @@ def get_num_game_variables(scenario_path: str):
     num_game_variables = game.get_available_game_variables_size()
     game.close()
     return num_game_variables
+
+def print_config(
+    device,
+    learning_rate, 
+    discount_factor,
+    train_epochs,
+    learning_steps_per_epoch,
+    test_episodes_per_epoch,
+    replay_memory_size,
+    batch_size,
+    frame_repeat,
+    resolution,
+    episodes_to_watch):
+
+    print("----------MODEL CONFIGURATION----------")
+    print("DEVICE:", device)
+    print("Learning Rate:", learning_rate)
+    print("Discount Factor:", discount_factor)
+    print("Train Epochs:", train_epochs)
+    print("Learning Steps per Epoch:", learning_steps_per_epoch)
+    print("Test Episodes per Epoch:", test_episodes_per_epoch)
+    print("Replay Memory Size:", replay_memory_size)
+    print("Batch Size:", batch_size)
+    print("Frame Repeat:", frame_repeat)
+    print("Resolution:", resolution)
+    print("Episodes to Watch:", episodes_to_watch)

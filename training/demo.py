@@ -72,7 +72,7 @@ AGENT_BY_MODEL = {
 RESOLUTION_BY_MODEL = {
     "q_cnn": (30, 45),
     "q_cnn_rgb": (96, 128),
-    "q_late_fusion": (30, 45),
+    "q_late_fusion": (96, 128),
     "q_late_fusion_rgb": (96, 128),
     "ppo_cnn": (30, 45),
     "ppo_cnn_gray": (96, 128),
