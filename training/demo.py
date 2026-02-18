@@ -16,7 +16,10 @@ from q_late_fusion import DQNAgent as DQNAgent_LateFusion
 from q_late_fusion_rgb import DQNAgent as DQNAgent_LateFusionRGB
 from q_cnn import DQNAgent as DQNAgent_CNN
 from q_cnn_rgb import DQNAgent as DQNAgent_CNNRGB
+from q_rainbow_rgb import DQNAgent as DQNAgent_RainbowRGB
 from ppo_cnn import PPOAgent
+from ppo_cnn_gray import PPOAgent as PPOAgent_Gray
+from ppo_cnn_gray import FrameStack, FRAME_STACK_SIZE
 
 # ---------- GLOBALS ----------
 # Just necessary for building the agent, can mostly ignore
@@ -48,6 +51,9 @@ MODEL_DEFAULT_SCENARIO = {
     "q_late_fusion": "defend_the_center.cfg",
     "q_late_fusion_rgb": "defend_the_center.cfg",
     "ppo_cnn": "defend_the_line.cfg",
+    "ppo_cnn_gray": "defend_the_center.cfg",
+    "q_late_fusion_rgb_DC": "deadly_corridor.cfg",
+    "q_rainbow_rgb": "defend_the_center.cfg",
 }
 
 # Map model type -> agent class
@@ -57,6 +63,9 @@ AGENT_BY_MODEL = {
     "q_late_fusion": DQNAgent_LateFusion,
     "q_late_fusion_rgb": DQNAgent_LateFusionRGB,
     "ppo_cnn": PPOAgent,
+    "ppo_cnn_gray": PPOAgent_Gray,
+    "q_late_fusion_rgb_DC": DQNAgent_LateFusionRGB,
+    "q_rainbow_rgb": DQNAgent_RainbowRGB,
 }
 
 # Map model type -> resolution (for preprocessing)
@@ -66,6 +75,9 @@ RESOLUTION_BY_MODEL = {
     "q_late_fusion": (30, 45),
     "q_late_fusion_rgb": (96, 128),
     "ppo_cnn": (30, 45),
+    "ppo_cnn_gray": (96, 128),
+    "q_late_fusion_rgb_DC": (96, 128),
+    "q_rainbow_rgb": (96, 128),
 }
 
 # Map model type -> RGB or grayscale
@@ -77,10 +89,16 @@ COLOR_BY_MODEL = {
     "q_late_fusion": GRAYSCALE,
     "q_late_fusion_rgb": RGB,
     "ppo_cnn": GRAYSCALE,
+    "ppo_cnn_gray": GRAYSCALE,
+    "q_late_fusion_rgb_DC": RGB,
+    "q_rainbow_rgb": RGB,
 }
 
 # PPO model interface
-PPO_MODELS = {"ppo_cnn"}
+PPO_MODELS = {"ppo_cnn", "ppo_cnn_gray"}
+
+# Models that use frame stacking
+FRAME_STACK_MODELS = {"ppo_cnn_gray"}
 
 
 # ---------- CLI PARSER ----------
@@ -210,16 +228,28 @@ if __name__ == "__main__":
             model_weights=model_path,
         )
 
+    # Set up frame stacking if needed
+    use_frame_stack = args.model_type in FRAME_STACK_MODELS
+    if use_frame_stack:
+        frame_stack = FrameStack(FRAME_STACK_SIZE, resolution)
+
     # Play episode with model
     total_score = 0
     for episode_num in range(EPISODES_TO_WATCH):
         game.new_episode()
+        if use_frame_stack:
+            frame_stack.reset()
         while not game.is_episode_finished():
             game_state = game.get_state()
             assert game_state is not None
             state_img = preprocess(game_state.screen_buffer, resolution)
             state_vars = preprocess_vars(game_state.game_variables, len(
                 game.get_available_game_variables()))
+
+            # Apply frame stacking if needed
+            if use_frame_stack:
+                frame_stack.push(state_img)
+                state_img = frame_stack.get()
 
             # PPO agents use deterministic=True for evaluation
             if args.model_type in PPO_MODELS:
