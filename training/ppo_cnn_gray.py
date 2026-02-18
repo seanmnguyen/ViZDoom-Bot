@@ -51,16 +51,12 @@ save_model = True
 load_model = False
 skip_learning = False
 
-print(config_file_path)
-
 # Device setup
 if torch.cuda.is_available():
     DEVICE = torch.device("cuda")
     torch.backends.cudnn.benchmark = True
 else:
     DEVICE = torch.device("cpu")
-
-print(f"Using device: {DEVICE}")
 
 
 def create_simple_game():
@@ -554,6 +550,9 @@ def run(game, agent, actions, num_epochs, steps_per_epoch, frame_repeat):
 
 
 if __name__ == "__main__":
+    print(config_file_path)
+    print(f"Using device: {DEVICE}")
+
     # Initialize game and actions
     game = create_simple_game()
     n = game.get_available_buttons_size()

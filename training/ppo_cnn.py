@@ -45,7 +45,6 @@ skip_learning = False
 
 # Configuration file path
 config_file_path = os.path.join(SCENARIO_PATH, "defend_the_line.cfg")
-print(config_file_path)
 
 # Device setup
 if torch.cuda.is_available():
@@ -53,9 +52,6 @@ if torch.cuda.is_available():
     torch.backends.cudnn.benchmark = True
 else:
     DEVICE = torch.device("cpu")
-
-print(f"Using device: {DEVICE}")
-
 
 def create_simple_game():
     """Initialize and configure the ViZDoom game."""
@@ -514,6 +510,9 @@ def run(game, agent, actions, num_epochs, steps_per_epoch, frame_repeat):
 
 
 if __name__ == "__main__":
+    print(config_file_path)
+    print(f"Using device: {DEVICE}")
+
     # Initialize game and actions
     game = create_simple_game()
     n = game.get_available_buttons_size()

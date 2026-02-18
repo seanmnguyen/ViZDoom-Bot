@@ -42,7 +42,6 @@ skip_learning = True
 
 # Configuration file path
 config_file_path = os.path.join(SCENARIO_PATH, "defend_the_line.cfg")
-print(config_file_path)
 
 # Uses GPU if available
 if torch.cuda.is_available():
@@ -307,6 +306,8 @@ class DQNAgent:
 
 
 if __name__ == "__main__":
+    print(config_file_path)
+    
     # Initialize game and actions
     game = create_simple_game()
     n = game.get_available_buttons_size()
