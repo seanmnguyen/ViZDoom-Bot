@@ -38,7 +38,7 @@ def preprocess_vars(v: np.ndarray, num_vars: int) -> np.ndarray:
         out[: min(num_vars, v.shape[0])] = v[: min(num_vars, v.shape[0])]
         v = out
 
-    health, ammo = v[0], v[1]
+    ammo, health = v[0], v[1]
 
     health = np.clip(health, 0.0, 100.0) / 100.0
     ammo   = np.clip(ammo,   0.0, 50.0)  / 50.0

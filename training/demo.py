@@ -16,6 +16,7 @@ from q_late_fusion import DQNAgent as DQNAgent_LateFusion
 from q_late_fusion_rgb import DQNAgent as DQNAgent_LateFusionRGB
 from q_cnn import DQNAgent as DQNAgent_CNN
 from q_cnn_rgb import DQNAgent as DQNAgent_CNNRGB
+from q_rainbow_rgb import DQNAgent as DQNAgent_RainbowRGB
 from ppo_cnn import PPOAgent
 
 # ---------- GLOBALS ----------
@@ -48,6 +49,8 @@ MODEL_DEFAULT_SCENARIO = {
     "q_late_fusion": "defend_the_center.cfg",
     "q_late_fusion_rgb": "defend_the_center.cfg",
     "ppo_cnn": "defend_the_line.cfg",
+    "q_late_fusion_rgb_DC": "deadly_corridor.cfg",
+    "q_rainbow_rgb": "defend_the_center.cfg",
 }
 
 # Map model type -> agent class
@@ -57,6 +60,8 @@ AGENT_BY_MODEL = {
     "q_late_fusion": DQNAgent_LateFusion,
     "q_late_fusion_rgb": DQNAgent_LateFusionRGB,
     "ppo_cnn": PPOAgent,
+    "q_late_fusion_rgb_DC": DQNAgent_LateFusionRGB,
+    "q_rainbow_rgb": DQNAgent_RainbowRGB,
 }
 
 # Map model type -> resolution (for preprocessing)
@@ -66,6 +71,8 @@ RESOLUTION_BY_MODEL = {
     "q_late_fusion": (30, 45),
     "q_late_fusion_rgb": (96, 128),
     "ppo_cnn": (30, 45),
+    "q_late_fusion_rgb_DC": (96, 128),
+    "q_rainbow_rgb": (96, 128),
 }
 
 # Map model type -> RGB or grayscale
@@ -77,6 +84,8 @@ COLOR_BY_MODEL = {
     "q_late_fusion": GRAYSCALE,
     "q_late_fusion_rgb": RGB,
     "ppo_cnn": GRAYSCALE,
+    "q_late_fusion_rgb_DC": RGB,
+    "q_rainbow_rgb": RGB,
 }
 
 # PPO model interface
