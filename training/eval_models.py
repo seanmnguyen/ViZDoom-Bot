@@ -27,7 +27,6 @@ import model_registry as MODELS
 
 import q_rainbow_stacked as rainbow_lazy_mod
 from ppo_cnn_gray import FrameStack as PPOFrameStack
-from ppo_cnn_gray import FRAME_STACK_SIZE as PPO_FRAME_STACK_SIZE
 
 # ---------- GLOBALS (same as demo.py; only used to construct agents) ----------
 learning_rate = 0.00025
@@ -175,7 +174,7 @@ def evaluate(game: vzd.DoomGame, agent, actions, *, model_type: str, resolution,
             if model_type in MODELS.PPO_MODELS:
                 a = agent.get_action(state_img, deterministic=True)
             else:
-                state_vars = preprocess_vars(gs.game_variables, expected_num_vars)
+                state_vars = preprocess_vars_safe(gs.game_variables, expected_num_vars)
                 # Prefer eval_mode=True if the agent supports it
                 try:
                     a = agent.get_action(state_img, state_vars, eval_mode=True)
@@ -252,10 +251,6 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Invalid color format for model type {args.model_type}")
     
-    if scenario_file == "deadly_corridor.cfg":
-        print("Using health-only game variables for Deadly Corridor scenario.")
-        preprocess_vars = preprocess_vars_health
-
     if hasattr(game, "set_render_hud"):
         game.set_render_hud(True)
 
@@ -305,7 +300,7 @@ if __name__ == "__main__":
             # Uses its own stacker: stores uint8 frames (C,H,W) and concatenates to (C*K,H,W).
             frame_stack = rainbow_lazy_mod.FrameStack(rainbow_lazy_mod.FRAME_STACK_SIZE, rainbow_lazy_mod.FRAME_C, resolution)
         else:
-            frame_stack = MODELS.FrameStack(MODELS.FRAME_STACK_SIZE, resolution)
+            frame_stack = MODELS.PPOFrameStack(MODELS.PPO_FRAME_STACK_SIZE, resolution)
     else:
         frame_stack = None
 
