@@ -116,6 +116,7 @@ class DuelQNet(nn.Module):
 
     def __init__(self, action_size: int):
         super().__init__()
+        self.num_vars = 0
 
         # CNN backbone — 3 input channels for RGB
         self.cnn = nn.Sequential(
