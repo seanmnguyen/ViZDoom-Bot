@@ -12,7 +12,7 @@ from torch.distributions import Categorical
 from tqdm import trange
 
 import vizdoom as vzd
-from utils import preprocess, SCENARIO_PATH
+from utils import preprocess_rgb, SCENARIO_PATH
 
 
 # PPO Hyperparameters
@@ -38,13 +38,13 @@ frame_repeat = 12
 resolution = (30, 45)
 episodes_to_watch = 10
 
-model_savefile = "../models/ppo_cnn.pth"
+model_savefile = "../models/ppo_cnn_rgb_center.pth"
 save_model = True
 load_model = False
 skip_learning = False
 
 # Configuration file path
-config_file_path = os.path.join(SCENARIO_PATH, "defend_the_line.cfg")
+config_file_path = os.path.join(SCENARIO_PATH, "defend_the_center.cfg")
 
 # Device setup
 if torch.cuda.is_available():
@@ -60,7 +60,7 @@ def create_simple_game():
     game.load_config(config_file_path)
     game.set_window_visible(False)
     game.set_mode(vzd.Mode.PLAYER)
-    game.set_screen_format(vzd.ScreenFormat.GRAY8)
+    game.set_screen_format(vzd.ScreenFormat.RGB24)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
     game.init()
     print("Doom initialized.")
@@ -81,7 +81,7 @@ class ActorCriticCNN(nn.Module):
 
         # Shared convolutional backbone
         self.conv1 = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
         )
         self.conv2 = nn.Sequential(
@@ -428,8 +428,15 @@ def test(game, agent, actions, num_episodes=100):
     for _ in trange(num_episodes, leave=False):
         game.new_episode()
         while not game.is_episode_finished():
-            state = preprocess(game.get_state().screen_buffer, resolution)
+
+            state = preprocess_rgb(game.get_state().screen_buffer, resolution)
+
+            # If preprocess_rgb returns HWC, convert to CHW for PyTorch Conv2d
+            if state.ndim == 3 and state.shape[-1] == 3:
+                state = np.transpose(state, (2, 0, 1))
+
             action = agent.get_action(state, deterministic=True)
+
             game.make_action(actions[action], frame_repeat)
         test_scores.append(game.get_total_reward())
 
@@ -461,7 +468,12 @@ def run(game, agent, actions, num_epochs, steps_per_epoch, frame_repeat):
 
         # Collect rollout
         for step in trange(steps_per_epoch, desc="Collecting rollout", leave=False):
-            state = preprocess(game.get_state().screen_buffer, resolution)
+            state = preprocess_rgb(game.get_state().screen_buffer, resolution)
+
+            # If preprocess_rgb returns HWC, convert to CHW for PyTorch Conv2d
+            if state.ndim == 3 and state.shape[-1] == 3:
+                state = np.transpose(state, (2, 0, 1))
+
             action, log_prob, value = agent.get_action(state)
 
             reward = game.make_action(actions[action], frame_repeat)
@@ -562,7 +574,12 @@ if __name__ == "__main__":
         while not game.is_episode_finished():
             game_state = game.get_state()
             assert game_state is not None
-            state = preprocess(game_state.screen_buffer, resolution)
+            state = preprocess_rgb(game_state.screen_buffer, resolution)
+
+            # If preprocess_rgb returns HWC, convert to CHW for PyTorch Conv2d
+            if state.ndim == 3 and state.shape[-1] == 3:
+                state = np.transpose(state, (2, 0, 1))
+
             action = agent.get_action(state, deterministic=True)
 
             game.set_action(actions[action])

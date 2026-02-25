@@ -38,18 +38,20 @@ frame_repeat = 12
 resolution = (30, 45)
 episodes_to_watch = 10
 
-model_savefile = "../models/ppo_cnn.pth"
+model_savefile = "models/deadly_corridor/ppo_cnn_gray.pth"
 save_model = True
 load_model = False
 skip_learning = False
 
 # Configuration file path
-config_file_path = os.path.join(SCENARIO_PATH, "defend_the_line.cfg")
+config_file_path = os.path.join(SCENARIO_PATH, "deadly_corridor.cfg")
 
 # Device setup
 if torch.cuda.is_available():
     DEVICE = torch.device("cuda")
     torch.backends.cudnn.benchmark = True
+elif torch.backends.mps.is_available():
+    DEVICE = torch.device("mps")
 else:
     DEVICE = torch.device("cpu")
 
