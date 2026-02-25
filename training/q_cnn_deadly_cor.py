@@ -48,8 +48,8 @@ episodes_to_watch = 10
 # Persistence
 model_savefile = "../models/deadly_corridor/q_cnn_deadly_corridor_rgb.pth"
 save_model     = True
-load_model     = False
-skip_learning  = False
+load_model     = True
+skip_learning  = True
 
 config_file_path = os.path.join(SCENARIO_PATH, "deadly_corridor.cfg")
 print(config_file_path)
