@@ -17,6 +17,8 @@ from q_late_fusion_rgb import DQNAgent as DQNAgent_LateFusionRGB
 from q_cnn import DQNAgent as DQNAgent_CNN
 from q_cnn_rgb import DQNAgent as DQNAgent_CNNRGB
 from q_rainbow_rgb import DQNAgent as DQNAgent_RainbowRGB
+from q_rainbow_stacked import DQNAgent as DQNAgent_RainbowLazyStack
+import q_rainbow_stacked as rainbow_lazy_mod
 from ppo_cnn import PPOAgent
 from ppo_cnn_gray import PPOAgent as PPOAgent_Gray
 from ppo_cnn_gray import FrameStack, FRAME_STACK_SIZE
@@ -54,6 +56,7 @@ MODEL_DEFAULT_SCENARIO = {
     "ppo_cnn_gray": "defend_the_center.cfg",
     "q_late_fusion_rgb_DC": "deadly_corridor.cfg",
     "q_rainbow_rgb": "defend_the_center.cfg",
+    "q_rainbow_stacked": "defend_the_center.cfg",
 }
 
 # Map model type -> agent class
@@ -66,6 +69,7 @@ AGENT_BY_MODEL = {
     "ppo_cnn_gray": PPOAgent_Gray,
     "q_late_fusion_rgb_DC": DQNAgent_LateFusionRGB,
     "q_rainbow_rgb": DQNAgent_RainbowRGB,
+    "q_rainbow_stacked": DQNAgent_RainbowLazyStack,
 }
 
 # Map model type -> resolution (for preprocessing)
@@ -78,11 +82,13 @@ RESOLUTION_BY_MODEL = {
     "ppo_cnn_gray": (96, 128),
     "q_late_fusion_rgb_DC": (96, 128),
     "q_rainbow_rgb": (96, 128),
+    "q_rainbow_stacked": (96, 128),
 }
 
 # Map model type -> RGB or grayscale
 GRAYSCALE = "GRAY8"
 RGB = "RGB24"
+AUTO = "AUTO"
 COLOR_BY_MODEL = {
     "q_cnn": GRAYSCALE,
     "q_cnn_rgb": RGB,
@@ -92,13 +98,14 @@ COLOR_BY_MODEL = {
     "ppo_cnn_gray": GRAYSCALE,
     "q_late_fusion_rgb_DC": RGB,
     "q_rainbow_rgb": RGB,
+    "q_rainbow_stacked": AUTO,
 }
 
 # PPO model interface
 PPO_MODELS = {"ppo_cnn", "ppo_cnn_gray"}
 
 # Models that use frame stacking
-FRAME_STACK_MODELS = {"ppo_cnn_gray"}
+FRAME_STACK_MODELS = {"ppo_cnn_gray", "q_rainbow_stacked"}
 
 
 # ---------- CLI PARSER ----------
@@ -163,6 +170,13 @@ def parse_cli():
 
     # Resolve default paths if not provided
     default_path = Path("../models") / f"{args.model_type}.pth"
+    # Prefer ../models/<scenario_stem>/<model_type>.pth if it exists (matches newer training layout).
+    scenario_default = MODEL_DEFAULT_SCENARIO.get(args.model_type)
+    if scenario_default:
+        scen_stem = Path(scenario_default).stem
+        alt = Path("../models") / scen_stem / f"{args.model_type}.pth"
+        if alt.exists():
+            default_path = alt
     model_path = Path(args.model_path) if args.model_path else default_path
 
     return args, agent_builder, model_path

@@ -45,6 +45,24 @@ def preprocess_vars(v: np.ndarray, num_vars: int) -> np.ndarray:
 
     return np.array([health, ammo], dtype=np.float32)
 
+def preprocess_vars_health(v: np.ndarray, num_vars: int) -> np.ndarray:
+    """
+    v: game_state.game_variables (shape: [num_vars])
+    returns float32 vector shape (num_vars,)
+    """
+    v = np.asarray(v, dtype=np.float32)
+    # safety sizing
+    if v.shape[0] != num_vars:
+        out = np.zeros((num_vars,), dtype=np.float32)
+        out[: min(num_vars, v.shape[0])] = v[: min(num_vars, v.shape[0])]
+        v = out
+
+    health = v[0] 
+
+    health = np.clip(health, 0.0, 100.0) / 100.0
+
+    return np.array([health], dtype=np.float32)
+
 def preprocess(img, resolution):
     """Down samples image to resolution"""
     img = skimage.transform.resize(img, resolution)
@@ -79,7 +97,7 @@ def print_config(
     frame_repeat,
     resolution,
     episodes_to_watch):
-
+    
     print("----------MODEL CONFIGURATION----------")
     print("DEVICE:", device)
     print("Learning Rate:", learning_rate)

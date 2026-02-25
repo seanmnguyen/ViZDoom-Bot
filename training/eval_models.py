@@ -29,6 +29,8 @@ from q_late_fusion_rgb import DQNAgent as DQNAgent_LateFusionRGB
 from q_cnn import DQNAgent as DQNAgent_CNN
 from q_cnn_rgb import DQNAgent as DQNAgent_CNNRGB
 from q_rainbow_rgb import DQNAgent as DQNAgent_RainbowRGB
+from q_rainbow_stacked import DQNAgent as DQNAgent_RainbowLazyStack
+import q_rainbow_stacked as rainbow_lazy_mod
 from ppo_cnn import PPOAgent
 from ppo_cnn_gray import PPOAgent as PPOAgent_Gray
 from ppo_cnn_gray import FrameStack, FRAME_STACK_SIZE
@@ -50,6 +52,7 @@ MODEL_DEFAULT_SCENARIO = {
     "ppo_cnn_gray": "defend_the_center.cfg",
     "q_late_fusion_rgb_DC": "deadly_corridor.cfg",
     "q_rainbow_rgb": "defend_the_center.cfg",
+    "q_rainbow_stacked": "defend_the_center.cfg",
 }
 
 AGENT_BY_MODEL = {
@@ -61,6 +64,7 @@ AGENT_BY_MODEL = {
     "ppo_cnn_gray": PPOAgent_Gray,
     "q_late_fusion_rgb_DC": DQNAgent_LateFusionRGB,
     "q_rainbow_rgb": DQNAgent_RainbowRGB,
+    "q_rainbow_stacked": DQNAgent_RainbowLazyStack,
 }
 
 RESOLUTION_BY_MODEL = {
@@ -72,10 +76,12 @@ RESOLUTION_BY_MODEL = {
     "ppo_cnn_gray": (96, 128),
     "q_late_fusion_rgb_DC": (96, 128),
     "q_rainbow_rgb": (96, 128),
+    "q_rainbow_stacked": (96, 128),
 }
 
 GRAYSCALE = "GRAY8"
 RGB = "RGB24"
+AUTO = "AUTO"
 COLOR_BY_MODEL = {
     "q_cnn": GRAYSCALE,
     "q_cnn_rgb": RGB,
@@ -85,13 +91,14 @@ COLOR_BY_MODEL = {
     "ppo_cnn_gray": GRAYSCALE,
     "q_late_fusion_rgb_DC": RGB,
     "q_rainbow_rgb": RGB,
+    "q_rainbow_stacked": AUTO,
 }
 
 # PPO model interface
 PPO_MODELS = {"ppo_cnn", "ppo_cnn_gray"}
 
 # Models that use frame stacking
-FRAME_STACK_MODELS = {"ppo_cnn_gray"}
+FRAME_STACK_MODELS = {"ppo_cnn_gray", "q_rainbow_stacked"}
 
 
 # ---------- CLI PARSER (demo.py-compatible) ----------
@@ -150,6 +157,14 @@ def parse_cli():
     agent_builder = AGENT_BY_MODEL[args.model_type]
 
     default_path = Path("../models") / f"{args.model_type}.pth"
+
+    # Prefer ../models/<scenario_stem>/<model_type>.pth if it exists (matches newer training layout).
+    scenario_default = MODEL_DEFAULT_SCENARIO.get(args.model_type)
+    if scenario_default:
+        scen_stem = Path(scenario_default).stem
+        alt = Path("../models") / scen_stem / f"{args.model_type}.pth"
+        if alt.exists():
+            default_path = alt
     model_path = Path(args.model_path) if args.model_path else default_path
 
     return args, agent_builder, model_path
@@ -187,24 +202,44 @@ def evaluate(game: vzd.DoomGame, agent, actions, *, model_type: str, resolution,
         game.new_episode()
 
         if use_frame_stack:
-            frame_stack.reset()
+            if model_type == "q_rainbow_stacked":
+                frame_stack.frames.clear()  # will be reset with first frame
+                if hasattr(frame_stack, "_inited"):
+                    frame_stack._inited = False
+            else:
+                frame_stack.reset()
 
         while not game.is_episode_finished():
             gs = game.get_state()
             if gs is None:
                 break
 
-            state_img = preprocess_fn(gs.screen_buffer, resolution)
+            # Preprocess
+            if model_type == "q_rainbow_stacked":
+                # This model expects uint8 CHW frames and does its own lazy stacking convention.
+                frame_u8 = rainbow_lazy_mod.preprocess_frame_u8(gs.screen_buffer)
+                if use_frame_stack:
+                    # Fill the stack with the first frame for a clean start (matches training).
+                    if not getattr(frame_stack, "_inited", False):
+                        frame_stack.reset(frame_u8)
+                        frame_stack._inited = True
+                    else:
+                        frame_stack.append(frame_u8)
+                    state_img = frame_stack.get()  # uint8 (C*K,H,W)
+                else:
+                    state_img = frame_u8
+            else:
+                state_img = preprocess_fn(gs.screen_buffer, resolution)
 
-            # Apply frame stacking if needed
-            if use_frame_stack:
-                frame_stack.push(state_img)
-                state_img = frame_stack.get()
+                # Apply frame stacking if needed
+                if use_frame_stack:
+                    frame_stack.push(state_img)
+                    state_img = frame_stack.get()
 
             if model_type in PPO_MODELS:
                 a = agent.get_action(state_img, deterministic=True)
             else:
-                state_vars = preprocess_vars(gs.game_variables, expected_num_vars)
+                state_vars = preprocess_vars_health(gs.game_variables, expected_num_vars)
                 # Prefer eval_mode=True if the agent supports it
                 try:
                     a = agent.get_action(state_img, state_vars, eval_mode=True)
@@ -262,12 +297,22 @@ if __name__ == "__main__":
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
 
     # Match demo.py's screen format selection, but without forcing HUD rendering in headless
-    if COLOR_BY_MODEL[args.model_type] == RGB:
+    # Match demo.py's screen format selection, but allow AUTO for modules that self-toggle RGB/Gray
+    color_mode = COLOR_BY_MODEL[args.model_type]
+    if color_mode == RGB:
         game.set_screen_format(vzd.ScreenFormat.RGB24)
         preprocess_fn = preprocess_rgb
-    elif COLOR_BY_MODEL[args.model_type] == GRAYSCALE:
+    elif color_mode == GRAYSCALE:
         game.set_screen_format(vzd.ScreenFormat.GRAY8)
         preprocess_fn = preprocess
+    elif color_mode == AUTO and args.model_type == "q_rainbow_stacked":
+        # Use the module's single switch (USE_GRAYSCALE) to decide.
+        if rainbow_lazy_mod.USE_GRAYSCALE:
+            game.set_screen_format(vzd.ScreenFormat.GRAY8)
+        else:
+            game.set_screen_format(vzd.ScreenFormat.RGB24)
+        # We will use rainbow_lazy_mod.preprocess_frame_u8 inside evaluate() for this model.
+        preprocess_fn = None
     else:
         raise ValueError(f"Invalid color format for model type {args.model_type}")
 
@@ -282,8 +327,24 @@ if __name__ == "__main__":
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
 
     # Build agent (same constructor conventions as demo.py)
+    # Build agent
     if args.model_type in PPO_MODELS:
         agent = AgentBuilder(action_size=len(actions), load_model_path=model_path)
+    elif args.model_type == "q_rainbow_stacked":
+        # This agent's constructor does not take load_model/model_weights; load weights manually.
+        agent = AgentBuilder(
+            action_size=len(actions),
+            lr=learning_rate,
+            discount_factor=discount_factor,
+            memory_size=replay_memory_size,
+            batch_size=batch_size,
+        )
+        try:
+            sd = torch.load(model_path, map_location=DEVICE, weights_only=True)
+        except TypeError:
+            sd = torch.load(model_path, map_location=DEVICE)
+        agent.q_net.load_state_dict(sd)
+        agent.set_eval_mode() if hasattr(agent, "set_eval_mode") else None
     else:
         agent = AgentBuilder(
             len(actions),
@@ -297,8 +358,14 @@ if __name__ == "__main__":
 
     # Set up frame stacking if needed
     use_frame_stack = args.model_type in FRAME_STACK_MODELS
+    # Set up frame stacking if needed
+    use_frame_stack = args.model_type in FRAME_STACK_MODELS
     if use_frame_stack:
-        frame_stack = FrameStack(FRAME_STACK_SIZE, resolution)
+        if args.model_type == "q_rainbow_stacked":
+            # Uses its own stacker: stores uint8 frames (C,H,W) and concatenates to (C*K,H,W).
+            frame_stack = rainbow_lazy_mod.FrameStack(rainbow_lazy_mod.FRAME_STACK_SIZE, rainbow_lazy_mod.FRAME_C, resolution)
+        else:
+            frame_stack = FrameStack(FRAME_STACK_SIZE, resolution)
     else:
         frame_stack = None
 
