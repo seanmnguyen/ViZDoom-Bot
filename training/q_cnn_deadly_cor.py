@@ -46,7 +46,7 @@ resolution        = (60, 90)   # (H, W) — larger res for corridor detail
 episodes_to_watch = 10
 
 # Persistence
-model_savefile = "../models/deadly_corridor/dqn_deadly_corridor_rgb.pth"
+model_savefile = "../models/deadly_corridor/q_cnn_deadly_corridor_rgb.pth"
 save_model     = True
 load_model     = True
 skip_learning  = True
