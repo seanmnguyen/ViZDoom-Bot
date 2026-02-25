@@ -32,6 +32,7 @@ from q_rainbow_rgb import DQNAgent as DQNAgent_RainbowRGB
 from ppo_cnn import PPOAgent
 from ppo_cnn_gray import PPOAgent as PPOAgent_Gray
 from ppo_cnn_gray import FrameStack, FRAME_STACK_SIZE
+from q_cnn_deadly_cor import DQNAgent as DQNAgent_DeadlyCorridor
 
 # ---------- GLOBALS (same as demo.py; only used to construct agents) ----------
 learning_rate = 0.00025
@@ -50,6 +51,7 @@ MODEL_DEFAULT_SCENARIO = {
     "ppo_cnn_gray": "defend_the_center.cfg",
     "q_late_fusion_rgb_DC": "deadly_corridor.cfg",
     "q_rainbow_rgb": "defend_the_center.cfg",
+    "q_cnn_deadly_cor": "deadly_corridor.cfg",
 }
 
 AGENT_BY_MODEL = {
@@ -61,6 +63,7 @@ AGENT_BY_MODEL = {
     "ppo_cnn_gray": PPOAgent_Gray,
     "q_late_fusion_rgb_DC": DQNAgent_LateFusionRGB,
     "q_rainbow_rgb": DQNAgent_RainbowRGB,
+    "q_cnn_deadly_cor": DQNAgent_DeadlyCorridor,
 }
 
 RESOLUTION_BY_MODEL = {
@@ -72,6 +75,7 @@ RESOLUTION_BY_MODEL = {
     "ppo_cnn_gray": (96, 128),
     "q_late_fusion_rgb_DC": (96, 128),
     "q_rainbow_rgb": (96, 128),
+    "q_cnn_deadly_cor": (60, 90),
 }
 
 GRAYSCALE = "GRAY8"
@@ -85,6 +89,7 @@ COLOR_BY_MODEL = {
     "ppo_cnn_gray": GRAYSCALE,
     "q_late_fusion_rgb_DC": RGB,
     "q_rainbow_rgb": RGB,
+    "q_cnn_deadly_cor": RGB,
 }
 
 # PPO model interface
