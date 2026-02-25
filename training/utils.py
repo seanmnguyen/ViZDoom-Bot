@@ -45,6 +45,44 @@ def preprocess_vars(v: np.ndarray, num_vars: int) -> np.ndarray:
 
     return np.array([health, ammo], dtype=np.float32)
 
+def preprocess_vars_safe(raw_vars: np.ndarray, expected: int) -> np.ndarray:
+    """Return a normalized vars vector of length `expected`.
+
+    For defend_the_center.cfg: available vars are {AMMO2, HEALTH}.
+    We normalize health to [0,1] by /100 and ammo to [0,1] by /50.
+    Output is [health, ammo, 0, 0, ...].
+    """
+    v = np.asarray(raw_vars, dtype=np.float32)
+    out = np.zeros((expected,), dtype=np.float32)
+    if expected <= 0:
+        return out
+
+    ammo = float(v[0]) if v.size >= 1 else 0.0
+    health = float(v[1]) if v.size >= 2 else 0.0
+
+    out[0] = np.clip(health, 0.0, 100.0) / 100.0
+    if expected >= 2:
+        out[1] = np.clip(ammo, 0.0, 50.0) / 50.0
+    return out
+
+def preprocess_vars_health(v: np.ndarray, num_vars: int) -> np.ndarray:
+    """
+    v: game_state.game_variables (shape: [num_vars])
+    returns float32 vector shape (num_vars,)
+    """
+    v = np.asarray(v, dtype=np.float32)
+    # safety sizing
+    if v.shape[0] != num_vars:
+        out = np.zeros((num_vars,), dtype=np.float32)
+        out[: min(num_vars, v.shape[0])] = v[: min(num_vars, v.shape[0])]
+        v = out
+
+    health = v[0] 
+
+    health = np.clip(health, 0.0, 100.0) / 100.0
+
+    return np.array([health], dtype=np.float32)
+
 def preprocess(img, resolution):
     """Down samples image to resolution"""
     img = skimage.transform.resize(img, resolution)
@@ -79,7 +117,7 @@ def print_config(
     frame_repeat,
     resolution,
     episodes_to_watch):
-
+    
     print("----------MODEL CONFIGURATION----------")
     print("DEVICE:", device)
     print("Learning Rate:", learning_rate)
