@@ -49,8 +49,8 @@ SCENARIO_NAME = "defend_the_center"
 # SCENARIO_NAME = "deadly_corridor"
 config_file_path = os.path.join(SCENARIO_PATH, f"{SCENARIO_NAME}.cfg")
 
-# MODEL_TYPE = os.path.splitext(os.path.basename(__file__))[0] + "2"
-MODEL_TYPE = os.path.splitext(os.path.basename(__file__))[0]
+MODEL_TYPE = os.path.splitext(os.path.basename(__file__))[0] + "3"
+# MODEL_TYPE = os.path.splitext(os.path.basename(__file__))[0]
 model_savefile = f"../models/{SCENARIO_NAME}/{MODEL_TYPE}.pth"
 os.makedirs(os.path.dirname(model_savefile), exist_ok=True)
 
@@ -1086,7 +1086,7 @@ def test(game, agent: DQNAgent, actions):
         frame = preprocess_frame_u8(gs.screen_buffer)
         stacker.reset(frame)
         obs = stacker.get()
-        vars_ = preprocess_vars(gs.game_variables, NUM_VARS)
+        vars_ = preprocess_vars_safe(gs.game_variables, NUM_VARS)
 
         while not game.is_episode_finished():
             a = agent.get_action(obs, vars_, eval_mode=True)
@@ -1102,7 +1102,7 @@ def test(game, agent: DQNAgent, actions):
             frame = preprocess_frame_u8(gs.screen_buffer)
             stacker.append(frame)
             obs = stacker.get()
-            vars_ = preprocess_vars(gs.game_variables, NUM_VARS)
+            vars_ = preprocess_vars_safe(gs.game_variables, NUM_VARS)
 
         scores.append(game.get_total_reward())
 
@@ -1133,7 +1133,7 @@ def run(game, agent: DQNAgent, actions, start_epoch: int = 0, start_global_step:
         frame = preprocess_frame_u8(gs.screen_buffer)
         stacker.reset(frame)
         obs = stacker.get()
-        vars_ = preprocess_vars(gs.game_variables, NUM_VARS)
+        vars_ = preprocess_vars_safe(gs.game_variables, NUM_VARS)
 
         train_scores = []
         losses = []
@@ -1163,7 +1163,7 @@ def run(game, agent: DQNAgent, actions, start_epoch: int = 0, start_global_step:
                 frame = preprocess_frame_u8(gs.screen_buffer)
                 stacker.reset(frame)
                 obs = stacker.get()
-                vars_ = preprocess_vars(gs.game_variables, NUM_VARS)
+                vars_ = preprocess_vars_safe(gs.game_variables, NUM_VARS)
             else:
                 ngs = game.get_state()
                 if ngs is None:
@@ -1176,12 +1176,12 @@ def run(game, agent: DQNAgent, actions, start_epoch: int = 0, start_global_step:
                     frame = preprocess_frame_u8(gs.screen_buffer)
                     stacker.reset(frame)
                     obs = stacker.get()
-                    vars_ = preprocess_vars(gs.game_variables, NUM_VARS)
+                    vars_ = preprocess_vars_safe(gs.game_variables, NUM_VARS)
                 else:
                     frame = preprocess_frame_u8(ngs.screen_buffer)
                     stacker.append(frame)
                     obs = stacker.get()
-                    vars_ = preprocess_vars(ngs.game_variables, NUM_VARS)
+                    vars_ = preprocess_vars_safe(ngs.game_variables, NUM_VARS)
 
             global_step += 1
 
@@ -1232,7 +1232,7 @@ def watch_trained(agent: DQNAgent, actions):
         frame = preprocess_frame_u8(gs.screen_buffer)
         stacker.reset(frame)
         obs = stacker.get()
-        vars_ = preprocess_vars(gs.game_variables, NUM_VARS)
+        vars_ = preprocess_vars_safe(gs.game_variables, NUM_VARS)
 
         while not game.is_episode_finished():
             a = agent.get_action(obs, vars_, eval_mode=True)
@@ -1250,7 +1250,7 @@ def watch_trained(agent: DQNAgent, actions):
             frame = preprocess_frame_u8(gs.screen_buffer)
             stacker.append(frame)
             obs = stacker.get()
-            vars_ = preprocess_vars(gs.game_variables, NUM_VARS)
+            vars_ = preprocess_vars_safe(gs.game_variables, NUM_VARS)
 
         score = game.get_total_reward()
         total += score
@@ -1259,24 +1259,6 @@ def watch_trained(agent: DQNAgent, actions):
 
     print(f"-----Average Score: {total / EPISODES_TO_WATCH:.2f}-----")
     game.close()
-
-def preprocess_vars(v: np.ndarray, num_vars: int) -> np.ndarray:
-    """
-    v: game_state.game_variables (shape: [num_vars])
-    returns float32 vector shape (num_vars,)
-    """
-    v = np.asarray(v, dtype=np.float32)
-    # safety sizing
-    if v.shape[0] != num_vars:
-        out = np.zeros((num_vars,), dtype=np.float32)
-        out[: min(num_vars, v.shape[0])] = v[: min(num_vars, v.shape[0])]
-        v = out
-
-    health = v[0] 
-
-    health = np.clip(health, 0.0, 100.0) / 100.0
-
-    return np.array([health], dtype=np.float32)
 
 
 # -----------------------------------------------------------------------------
