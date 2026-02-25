@@ -63,20 +63,7 @@ print(f"Using device: {DEVICE}")
 # ── Actions ───────────────────────────────────────────────────────────────────
 # Buttons: [MOVE_LEFT, MOVE_RIGHT, ATTACK, MOVE_FORWARD, MOVE_BACKWARD, TURN_LEFT, TURN_RIGHT]
 
-actions = [
-    [0, 0, 0, 1, 0, 0, 0],  # move forward
-    [0, 0, 0, 0, 1, 0, 0],  # move backward
-    [1, 0, 0, 0, 0, 0, 0],  # move left
-    [0, 1, 0, 0, 0, 0, 0],  # move right
-    [0, 0, 0, 0, 0, 1, 0],  # turn left
-    [0, 0, 0, 0, 0, 0, 1],  # turn right
-    [0, 0, 1, 0, 0, 0, 0],  # attack
-    [0, 0, 1, 1, 0, 0, 0],  # forward + attack
-    [0, 0, 1, 0, 0, 1, 0],  # turn left + attack
-    [0, 0, 1, 0, 0, 0, 1],  # turn right + attack
-    [1, 0, 0, 1, 0, 0, 0],  # move left + forward
-    [0, 1, 0, 1, 0, 0, 0],  # move right + forward
-]
+actions = [list(a) for a in it.product([0, 1], repeat=7)]
 
 
 # ── Preprocessing ─────────────────────────────────────────────────────────────
