@@ -25,12 +25,12 @@ from utils import SCENARIO_PATH
 
 # ── Hyperparameters ───────────────────────────────────────────────────────────
 
-learning_rate     = 0.00025
-discount_factor   = 0.99
-train_epochs      = 20
-steps_per_epoch   = 4000
+learning_rate      = 0.00025
+discount_factor    = 0.99
+train_epochs       = 20
+steps_per_epoch    = 4000
 replay_memory_size = 20000
-batch_size        = 64
+batch_size         = 64
 
 # Epsilon-greedy exploration
 epsilon_start = 1.0
@@ -46,10 +46,10 @@ resolution        = (60, 90)   # (H, W) — larger res for corridor detail
 episodes_to_watch = 10
 
 # Persistence
-model_savefile = "../models/deadly_corridor/q_cnn_deadly_corridor_rgb.pth"
+model_savefile = "../models/dqn_deadly_corridor_rgb.pth"
 save_model     = True
-load_model     = True
-skip_learning  = True
+load_model     = False
+skip_learning  = False
 
 config_file_path = os.path.join(SCENARIO_PATH, "deadly_corridor.cfg")
 print(config_file_path)
@@ -187,8 +187,8 @@ class DuelQNet(nn.Module):
 
         x = self.shared(x)
 
-        value      = self.value_stream(x)
-        advantage  = self.advantage_stream(x)
+        value     = self.value_stream(x)
+        advantage = self.advantage_stream(x)
 
         # Dueling aggregation: Q = V + (A - mean(A))
         q = value + (advantage - advantage.mean(dim=1, keepdim=True))
@@ -228,32 +228,33 @@ class DQNAgent:
 
     def __init__(
         self,
-        action_size:      int,
-        memory_size:      int   = 20000,
-        batch_size:       int   = 64,
-        discount_factor:  float = 0.99,
-        lr:               float = 0.00025,
-        epsilon:          float = 1.0,
-        epsilon_decay:    float = 0.9996,
-        epsilon_min:      float = 0.1,
-        load_model_path:  str   = None,
+        action_size:     int,
+        lr:              float = 0.00025,
+        batch_size:      int   = 64,
+        memory_size:     int   = 20000,
+        discount_factor: float = 0.99,
+        load_model:      bool  = False,
+        model_weights:   str   = None,
+        epsilon:         float = 1.0,
+        epsilon_decay:   float = 0.9996,
+        epsilon_min:     float = 0.1,
     ):
-        self.action_size     = action_size
-        self.batch_size      = batch_size
-        self.discount        = discount_factor
-        self.epsilon         = epsilon
-        self.epsilon_decay   = epsilon_decay
-        self.epsilon_min     = epsilon_min
+        self.action_size   = action_size
+        self.batch_size    = batch_size
+        self.discount      = discount_factor
+        self.epsilon       = epsilon
+        self.epsilon_decay = epsilon_decay
+        self.epsilon_min   = epsilon_min
 
-        self.memory   = ReplayBuffer(memory_size)
+        self.memory    = ReplayBuffer(memory_size)
         self.criterion = nn.SmoothL1Loss()  # Huber loss — more stable than MSE
 
         self.q_net      = DuelQNet(action_size).to(DEVICE)
         self.target_net = DuelQNet(action_size).to(DEVICE)
 
-        if load_model_path:
-            print(f"Loading model from: {load_model_path}")
-            sd = torch.load(load_model_path, map_location=DEVICE)
+        if load_model and model_weights:
+            print(f"Loading model from: {model_weights}")
+            sd = torch.load(model_weights, map_location=DEVICE)
             self.q_net.load_state_dict(sd)
             self.target_net.load_state_dict(sd)
             self.epsilon = epsilon_min
@@ -267,8 +268,18 @@ class DQNAgent:
     # ── Inference ──────────────────────────────────────────────────────────
 
     @torch.no_grad()
-    def get_action(self, state: np.ndarray, health: float) -> int:
-        if np.random.uniform() < self.epsilon:
+    def get_action(self, state: np.ndarray, state_vars=None, eval_mode: bool = False) -> int:
+        """
+        state_vars: ignored (health is read from state_vars[0] if provided,
+                    otherwise defaults to 100). Kept for eval_models.py compatibility.
+        """
+        # Extract health from state_vars if provided by eval script
+        if state_vars is not None and len(state_vars) > 0:
+            health = float(state_vars[0])
+        else:
+            health = 100.0
+
+        if not eval_mode and np.random.uniform() < self.epsilon:
             return random.randrange(self.action_size)
 
         frame_t  = torch.from_numpy(state).unsqueeze(0).float().to(DEVICE)
@@ -290,13 +301,13 @@ class DQNAgent:
         states, healths, actions, rewards, next_states, next_healths, dones = \
             self.memory.sample(self.batch_size)
 
-        states_t      = torch.from_numpy(states).float().to(DEVICE)
-        healths_t     = torch.from_numpy(healths).to(DEVICE)
-        actions_t     = torch.from_numpy(actions).to(DEVICE)
-        rewards_t     = torch.from_numpy(rewards).to(DEVICE)
-        next_states_t = torch.from_numpy(next_states).float().to(DEVICE)
-        next_healths_t= torch.from_numpy(next_healths).to(DEVICE)
-        not_dones     = torch.from_numpy(~dones).to(DEVICE)
+        states_t       = torch.from_numpy(states).float().to(DEVICE)
+        healths_t      = torch.from_numpy(healths).to(DEVICE)
+        actions_t      = torch.from_numpy(actions).to(DEVICE)
+        rewards_t      = torch.from_numpy(rewards).to(DEVICE)
+        next_states_t  = torch.from_numpy(next_states).float().to(DEVICE)
+        next_healths_t = torch.from_numpy(next_healths).to(DEVICE)
+        not_dones      = torch.from_numpy(~dones).to(DEVICE)
 
         # Double DQN: select action with q_net, evaluate with target_net
         with torch.no_grad():
@@ -341,7 +352,7 @@ def test(game, agent, num_episodes: int = 10):
         game.new_episode()
         while not game.is_episode_finished():
             frame, health = get_state(game)
-            action = agent.get_action(frame, health)
+            action = agent.get_action(frame, state_vars=[health], eval_mode=True)
             game.make_action(actions[action], frame_repeat)
         scores.append(game.get_total_reward())
 
@@ -369,7 +380,7 @@ def run(game, agent, num_epochs, steps_per_epoch, frame_repeat):
 
         for _ in trange(steps_per_epoch, desc="Training", leave=False):
             frame, health = get_state(game)
-            action = agent.get_action(frame, health)
+            action = agent.get_action(frame, state_vars=[health])
 
             reward = game.make_action(actions[action], frame_repeat)
             done   = game.is_episode_finished()
@@ -430,7 +441,8 @@ if __name__ == "__main__":
         epsilon         = epsilon_start,
         epsilon_decay   = epsilon_decay,
         epsilon_min     = epsilon_min,
-        load_model_path = model_savefile if load_model else None,
+        load_model      = load_model,
+        model_weights   = model_savefile if load_model else None,
     )
 
     if not skip_learning:
@@ -456,7 +468,7 @@ if __name__ == "__main__":
             assert gs is not None
             frame  = preprocess_rgb(gs.screen_buffer, resolution)
             health = gs.game_variables[0]
-            action = agent.get_action(frame, health)
+            action = agent.get_action(frame, state_vars=[health], eval_mode=True)
             game.set_action(actions[action])
             for _ in range(frame_repeat):
                 game.advance_action()
