@@ -23,6 +23,21 @@ import model_registry as MODELS
 # Globals (only used to construct agents)
 # -----------------------------------------------------------------------------
 
+# AGENT IMPORTS
+from q_late_fusion import DQNAgent as DQNAgent_LateFusion
+from q_late_fusion_rgb import DQNAgent as DQNAgent_LateFusionRGB
+from q_cnn import DQNAgent as DQNAgent_CNN
+from q_cnn_rgb import DQNAgent as DQNAgent_CNNRGB
+from q_rainbow_rgb import DQNAgent as DQNAgent_RainbowRGB
+from ppo_cnn import PPOAgent
+from ppo_cnn_gray import PPOAgent as PPOAgent_Gray
+from ppo_cnn_gray import FrameStack, FRAME_STACK_SIZE
+from ppo_late_fusion_rgb import PPOAgent as PPOAgent_LateFusionRGB
+from ppo_late_fusion_rgb import FrameStackRGB, RGB_CHANNELS as LF_RGB_CHANNELS
+
+# ---------- GLOBALS ----------
+# Just necessary for building the agent, can mostly ignore
+# Q-learning settings
 learning_rate = 0.00025
 discount_factor = 0.99
 replay_memory_size = 10000
@@ -41,6 +56,75 @@ else:
 # CLI
 # -----------------------------------------------------------------------------
 
+# ---------- MODEL MAPPINGS ----------
+# Default scenario for each model type (matches training configs)
+MODEL_DEFAULT_SCENARIO = {
+    "q_cnn": "defend_the_line.cfg",
+    "q_cnn_rgb": "defend_the_line.cfg",
+    "q_late_fusion": "defend_the_center.cfg",
+    "q_late_fusion_rgb": "defend_the_center.cfg",
+    "ppo_cnn": "defend_the_line.cfg",
+    "ppo_cnn_gray": "defend_the_center.cfg",
+    "ppo_late_fusion_rgb": "defend_the_center.cfg",
+    "q_late_fusion_rgb_DC": "deadly_corridor.cfg",
+    "q_rainbow_rgb": "defend_the_center.cfg",
+}
+
+# Map model type -> agent class
+AGENT_BY_MODEL = {
+    "q_cnn": DQNAgent_CNN,
+    "q_cnn_rgb": DQNAgent_CNNRGB,
+    "q_late_fusion": DQNAgent_LateFusion,
+    "q_late_fusion_rgb": DQNAgent_LateFusionRGB,
+    "ppo_cnn": PPOAgent,
+    "ppo_cnn_gray": PPOAgent_Gray,
+    "ppo_late_fusion_rgb": PPOAgent_LateFusionRGB,
+    "q_late_fusion_rgb_DC": DQNAgent_LateFusionRGB,
+    "q_rainbow_rgb": DQNAgent_RainbowRGB,
+}
+
+# Map model type -> resolution (for preprocessing)
+RESOLUTION_BY_MODEL = {
+    "q_cnn": (30, 45),
+    "q_cnn_rgb": (96, 128),
+    "q_late_fusion": (96, 128),
+    "q_late_fusion_rgb": (96, 128),
+    "ppo_cnn": (30, 45),
+    "ppo_cnn_gray": (96, 128),
+    "ppo_late_fusion_rgb": (96, 128),
+    "q_late_fusion_rgb_DC": (96, 128),
+    "q_rainbow_rgb": (96, 128),
+}
+
+# Map model type -> RGB or grayscale
+GRAYSCALE = "GRAY8"
+RGB = "RGB24"
+COLOR_BY_MODEL = {
+    "q_cnn": GRAYSCALE,
+    "q_cnn_rgb": RGB,
+    "q_late_fusion": GRAYSCALE,
+    "q_late_fusion_rgb": RGB,
+    "ppo_cnn": GRAYSCALE,
+    "ppo_cnn_gray": GRAYSCALE,
+    "ppo_late_fusion_rgb": RGB,
+    "q_late_fusion_rgb_DC": RGB,
+    "q_rainbow_rgb": RGB,
+}
+
+# PPO model interface
+PPO_MODELS = {"ppo_cnn", "ppo_cnn_gray", "ppo_late_fusion_rgb"}
+
+# Models that use grayscale frame stacking
+FRAME_STACK_MODELS = {"ppo_cnn_gray"}
+
+# Models that use RGB frame stacking
+RGB_FRAME_STACK_MODELS = {"ppo_late_fusion_rgb"}
+
+# Late-fusion PPO models (need state_vars in get_action)
+LATE_FUSION_PPO_MODELS = {"ppo_late_fusion_rgb"}
+
+
+# ---------- CLI PARSER ----------
 def str2bool(v):
     """Parse bools from CLI strings."""
     if isinstance(v, bool):
