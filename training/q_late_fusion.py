@@ -35,7 +35,7 @@ config_file_path = os.path.join(SCENARIO_PATH, f"{SCENARIO_NAME}.cfg")
 
 # Other parameters
 frame_repeat = 12
-resolution = (30, 45)  # (30, 45) default; (96, 128) to keep aspect ratio
+resolution = (96, 128)  
 episodes_to_watch = 10
 
 # Save to a new model file to not overwrite
@@ -52,19 +52,6 @@ else:
     DEVICE = torch.device("cpu")
 
 NUM_VARS = get_num_game_variables(config_file_path)
-
-print("----------MODEL CONFIGURATION----------")
-print("DEVICE:", DEVICE)
-print("Learning Rate:", learning_rate)
-print("Discount Factor:", discount_factor)
-print("Train Epochs:", train_epochs)
-print("Learning Steps per Epoch:", learning_steps_per_epoch)
-print("Test Episodes per Epoch:", test_episodes_per_epoch)
-print("Replay Memory Size:", replay_memory_size)
-print("Batch Size:", batch_size)
-print("Frame Repeat:", frame_repeat)
-print("Resolution:", resolution)
-print("Episodes to Watch:", episodes_to_watch)
 
 def create_simple_game():
     print("Initializing doom...")
@@ -375,6 +362,9 @@ class DQNAgent:
 
 
 if __name__ == "__main__":
+    print_config(DEVICE, learning_rate, discount_factor, train_epochs, learning_steps_per_epoch, test_episodes_per_epoch,
+        replay_memory_size, batch_size, frame_repeat, resolution, episodes_to_watch)
+
     # Initialize game and actions
     game = create_simple_game()
     n = game.get_available_buttons_size()
