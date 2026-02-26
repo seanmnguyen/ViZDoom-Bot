@@ -11,11 +11,14 @@ from q_rainbow_stacked import DQNAgent as DQNAgent_RainbowLazyStack
 import q_rainbow_stacked as rainbow_lazy_mod
 from ppo_cnn import PPOAgent
 from ppo_cnn_gray import PPOAgent as PPOAgent_Gray
-from ppo_cnn_gray import FrameStack as PPOFrameStack
-from ppo_cnn_gray import FRAME_STACK_SIZE as PPO_FRAME_STACK_SIZE
+from ppo_cnn_gray import FrameStack as PPOFrameStackGray
+from ppo_cnn_gray import FRAME_STACK_SIZE as PPO_FRAME_STACK_SIZE_GRAY
 from ppo_cnn_rgb_center import PPOAgent as PPOAgent_CNNRGBCenter
 from ppo_late_fusion_rgb_center import PPOAgent as PPOAgent_LateFusionRGBCenter
 from ppo_cnn_deadly_corridor_gray import PPOAgent as PPOAgent_CNNDeadlyCorridorGray
+from ppo_late_fusion_rgb import PPOAgent as PPOAgent_LateFusionRGB
+from ppo_late_fusion_rgb import FrameStackRGB as PPOFrameStackRGB
+from ppo_late_fusion_rgb import FRAME_STACK_SIZE as PPO_FRAME_STACK_SIZE_RGB
 
 # -----------------------------------------------------------------------------
 # Model registry
@@ -34,6 +37,7 @@ MODEL_DEFAULT_SCENARIO = {
     "q_rainbow_rgb": "defend_the_center.cfg",
     "q_rainbow_stacked": "defend_the_center.cfg",
     "ppo_cnn_deadly_corridor_gray": "deadly_corridor.cfg",
+    "ppo_late_fusion_rgb": "defend_the_center.cfg",
 }
 
 AGENT_BY_MODEL = {
@@ -49,6 +53,7 @@ AGENT_BY_MODEL = {
     "q_rainbow_rgb": DQNAgent_RainbowRGB,
     "q_rainbow_stacked": DQNAgent_RainbowLazyStack,
     "ppo_cnn_deadly_corridor_gray": PPOAgent_CNNDeadlyCorridorGray,
+    "ppo_late_fusion_rgb": PPOAgent_LateFusionRGB,
 }
 
 RESOLUTION_BY_MODEL = {
@@ -64,6 +69,7 @@ RESOLUTION_BY_MODEL = {
     "q_rainbow_rgb": (96, 128),
     "q_rainbow_stacked": (96, 128),
     "ppo_cnn_deadly_corridor_gray": (30, 45),
+    "ppo_late_fusion_rgb": (96, 128),
 }
 
 GRAYSCALE = "GRAY8"
@@ -82,6 +88,7 @@ COLOR_BY_MODEL = {
     "q_rainbow_rgb": RGB,
     "q_rainbow_stacked": AUTO,
     "ppo_cnn_deadly_corridor_gray": GRAYSCALE,
+    "ppo_late_fusion_rgb": RGB,
 }
 
 PPO_MODELS = {
@@ -90,12 +97,18 @@ PPO_MODELS = {
     "ppo_cnn_rgb_center",
     "ppo_late_fusion_rgb_center",
     "ppo_cnn_deadly_corridor_gray",
+    "ppo_late_fusion_rgb",
 }
 
+# Models that use frame stacking, differentiates grayscale and RGB
 FRAME_STACK_MODELS = {
-    "ppo_cnn_gray",
-    "q_rainbow_stacked",
+    "ppo_cnn_gray": GRAYSCALE,
+    "ppo_late_fusion_rgb": RGB,
+    "q_rainbow_stacked": AUTO,
 }
+
+# Late-fusion PPO models (need state_vars in get_action)
+LATE_FUSION_PPO_MODELS = {"ppo_late_fusion_rgb"}
 
 # Lazy-stacked Rainbow models need special preprocessing
 LAZY_STACK_MODULE_BY_MODEL = {

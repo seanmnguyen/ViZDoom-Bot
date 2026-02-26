@@ -172,7 +172,11 @@ def evaluate(game: vzd.DoomGame, agent, actions, *, model_type: str, resolution,
                     state_img = frame_stack.get()
 
             if model_type in MODELS.PPO_MODELS:
-                a = agent.get_action(state_img, deterministic=True)
+                if model_type in MODELS.LATE_FUSION_PPO_MODELS:
+                    state_vars = preprocess_vars_safe(gs.game_variables, expected_num_vars)
+                    a = agent.get_action(state_img, state_vars, deterministic=True)
+                else:
+                    a = agent.get_action(state_img, deterministic=True)
             else:
                 state_vars = preprocess_vars_safe(gs.game_variables, expected_num_vars)
                 # Prefer eval_mode=True if the agent supports it
@@ -293,14 +297,20 @@ if __name__ == "__main__":
 
     # Set up frame stacking if needed
     use_frame_stack = args.model_type in MODELS.FRAME_STACK_MODELS
-    # Set up frame stacking if needed
-    use_frame_stack = args.model_type in MODELS.FRAME_STACK_MODELS
     if use_frame_stack:
-        if args.model_type == "q_rainbow_stacked":
+        if args.model_type == MODELS.LAZY_STACK_MODULE_BY_MODEL:
             # Uses its own stacker: stores uint8 frames (C,H,W) and concatenates to (C*K,H,W).
             frame_stack = rainbow_lazy_mod.FrameStack(rainbow_lazy_mod.FRAME_STACK_SIZE, rainbow_lazy_mod.FRAME_C, resolution)
+        elif color_mode == MODELS.GRAYSCALE:
+            if MODELS.PPOFrameStackGray is None:
+                raise RuntimeError("PPOFrameStackGray import failed, but frame stacking was requested.")
+            frame_stack = MODELS.PPOFrameStackGray(MODELS.PPO_FRAME_STACK_SIZE_GRAY, resolution)
+        elif color_mode == MODELS.RGB:
+            if MODELS.PPOFrameStackRGB is None:
+                raise RuntimeError("PPOFrameStackRGB import failed, but frame stacking was requested.")
+            frame_stack = MODELS.PPOFrameStackRGB(MODELS.PPO_FRAME_STACK_SIZE_RGB, resolution)
         else:
-            frame_stack = MODELS.PPOFrameStack(MODELS.PPO_FRAME_STACK_SIZE, resolution)
+            raise ValueError(f"Unsupported color mode {color_mode} for frame stacking.")
     else:
         frame_stack = None
 

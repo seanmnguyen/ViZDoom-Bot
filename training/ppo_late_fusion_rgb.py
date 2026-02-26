@@ -289,7 +289,7 @@ class ActorCriticLateFusion(nn.Module):
 class FrameStackRGB:
     """Maintains a stack of recent RGB frames for temporal context."""
 
-    def __init__(self, stack_size, frame_shape, channels=3):
+    def __init__(self, stack_size, frame_shape, channels=RGB_CHANNELS):
         self.stack_size = stack_size
         self.channels = channels
         self.frame_shape = frame_shape  # (H, W)
