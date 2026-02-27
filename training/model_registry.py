@@ -108,7 +108,10 @@ FRAME_STACK_MODELS = {
 }
 
 # Late-fusion PPO models (need state_vars in get_action)
-LATE_FUSION_PPO_MODELS = {"ppo_late_fusion_rgb"}
+LATE_FUSION_PPO_MODELS = {
+    "ppo_late_fusion_rgb",
+    "ppo_late_fusion_rgb_center",
+}
 
 # Lazy-stacked Rainbow models need special preprocessing
 LAZY_STACK_MODULE_BY_MODEL = {
