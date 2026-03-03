@@ -1,6 +1,41 @@
 #!/usr/bin/env python3
 
+"""
+test run 1:
+==================================================
+Episode 1 Total Score: 305.91168212890625
+Episode 2 Total Score: 51.98722839355469
+Episode 3 Total Score: 67.29446411132812
+Episode 4 Total Score: 416.0734100341797
+Episode 5 Total Score: 28.7291259765625
+Episode 6 Total Score: 50.899810791015625
+Episode 7 Total Score: 177.4473876953125
+Episode 8 Total Score: 32.54685974121094
+Episode 9 Total Score: -31.660614013671875
+Episode 10 Total Score: 70.52247619628906
+
+-----Average Score: 116.97518310546874-----
+"""
+
+"""
+test run 2:
+==================================================
+Episode 1 Total Score: 419.87193298339844
+Episode 2 Total Score: 460.5805206298828
+Episode 3 Total Score: 393.7855987548828
+Episode 4 Total Score: 469.3984832763672
+Episode 5 Total Score: 440.26678466796875
+Episode 6 Total Score: 310.6322479248047
+Episode 7 Total Score: 392.44020080566406
+Episode 8 Total Score: 467.6341857910156
+Episode 9 Total Score: 389.23020935058594
+Episode 10 Total Score: 380.39549255371094
+
+-----Average Score: 412.42356567382814-----
+"""
+
 import itertools as it
+import math
 import os
 from collections import deque
 from time import sleep, time
@@ -16,23 +51,31 @@ from tqdm import trange
 import vizdoom as vzd
 from utils import preprocess_rgb, preprocess_vars_health, SCENARIO_PATH, RESOLUTION, get_num_game_variables
 
-
 learning_rate = 2.5e-4
-gamma = 0.99          # discount factor
-gae_lambda = 0.95     # GAE lambda for advantage estimation
-clip_epsilon = 0.2    # PPO clip parameter
-entropy_coef = 0.01   # entropy bonus coefficient (encourage exploration in complex corridor)
-value_coef = 0.5      # value loss coefficient
-max_grad_norm = 0.5   # gradient clipping
+gamma = 0.99            # discount factor
+gae_lambda = 0.95       # GAE lambda for advantage estimation
+clip_epsilon = 0.2      # PPO clip parameter
+entropy_coef_start = 0.02  # initial entropy bonus
+entropy_coef_end = 0.002   # final entropy bonus
+value_coef = 0.5        # value loss coefficient
+max_grad_norm = 0.5     # gradient clipping
+value_clip_range = 0.2  # value function clipping range
 
-FRAME_STACK_SIZE = 4          # consecutive frames stacked as input channels
+FRAME_STACK_SIZE = 4
 RGB_CHANNELS = 3
-INPUT_CHANNELS = FRAME_STACK_SIZE * RGB_CHANNELS  # 4 * 3 = 12
+INPUT_CHANNELS = FRAME_STACK_SIZE * RGB_CHANNELS  # 12
 
-train_epochs = 30
-steps_per_epoch = 4096    # rollout length before each PPO update
-ppo_epochs = 4            # PPO update passes per batch
-mini_batch_size = 64      # mini-batch size for PPO updates
+train_epochs = 60
+steps_per_epoch = 8192    # larger rollouts for more stable updates
+ppo_epochs = 6            # more PPO passes per batch
+mini_batch_size = 128     # larger mini-batch for stability
+
+HEALTH_LOSS_PENALTY = 0.5    # penalty per health point lost (higher = cautious play)
+SURVIVAL_BONUS = 0.02        # small reward per step alive
+KILL_REWARD = 20.0           # large reward per enemy killed
+DISTANCE_REWARD_SCALE = 0.3  # scale down the raw distance reward so kills dominate
+ADVANCE_WHILE_ENEMIES_PENALTY = 0.5  # penalty for moving forward when recently taking damage
+ENEMIES_PER_ROOM = 2         # expected enemies per room section
 
 test_episodes_per_epoch = 100
 
@@ -45,8 +88,8 @@ config_file_path = os.path.join(SCENARIO_PATH, f"{SCENARIO_NAME}.cfg")
 
 model_savefile = f"../models/{SCENARIO_NAME}/ppo_late_fusion_rgb.pth"
 save_model = True
-load_model = False
-skip_learning = False
+load_model = True
+skip_learning = True
 
 if torch.cuda.is_available():
     DEVICE = torch.device("cuda")
@@ -60,9 +103,43 @@ print(config_file_path)
 print(f"Using device: {DEVICE}")
 print(f"Number of game variables: {NUM_VARS}")
 
+def get_deadly_corridor_actions():
+    actions = [
+
+        [0, 0, 0, 1, 0, 0, 0],  # forward
+        [0, 0, 0, 0, 1, 0, 0],  # backward
+        [1, 0, 0, 0, 0, 0, 0],  # strafe left
+        [0, 1, 0, 0, 0, 0, 0],  # strafe right
+        [0, 0, 0, 0, 0, 1, 0],  # turn left
+        [0, 0, 0, 0, 0, 0, 1],  # turn right
+
+        [1, 0, 0, 1, 0, 0, 0],  # forward + strafe left
+        [0, 1, 0, 1, 0, 0, 0],  # forward + strafe right
+
+        [0, 0, 0, 1, 0, 1, 0],  # forward + turn left
+        [0, 0, 0, 1, 0, 0, 1],  # forward + turn right
+
+        [0, 0, 1, 0, 0, 0, 0],  # shoot (stationary)
+        [0, 0, 1, 0, 0, 1, 0],  # shoot + turn left
+        [0, 0, 1, 0, 0, 0, 1],  # shoot + turn right
+
+        [1, 0, 1, 0, 0, 0, 0],  # strafe left + shoot
+        [0, 1, 1, 0, 0, 0, 0],  # strafe right + shoot
+        [1, 0, 1, 0, 0, 1, 0],  # strafe left + shoot + turn left
+        [0, 1, 1, 0, 0, 0, 1],  # strafe right + shoot + turn right
+
+        [0, 0, 1, 1, 0, 0, 0],  # shoot + forward
+        [1, 0, 1, 1, 0, 0, 0],  # shoot + forward + strafe left
+        [0, 1, 1, 1, 0, 0, 0],  # shoot + forward + strafe right
+
+        [0, 0, 1, 0, 1, 0, 0],  # shoot + backward
+
+        [0, 0, 0, 0, 0, 0, 0],
+    ]
+    return actions
+
 
 def create_simple_game():
-    """Initialize and configure the ViZDoom game for deadly_corridor."""
     print("Initializing doom...")
     game = vzd.DoomGame()
     game.load_config(config_file_path)
@@ -70,13 +147,19 @@ def create_simple_game():
     game.set_mode(vzd.Mode.PLAYER)
     game.set_screen_format(vzd.ScreenFormat.RGB24)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
+    game.add_available_game_variable(vzd.GameVariable.KILLCOUNT)
     game.init()
     print("Doom initialized.")
     return game
 
 
+def preprocess_rgb_normalized(img, res=resolution):
+    x = preprocess_rgb(img, res)
+    x /= 255.0
+    return x
+
+
 class SEBlock(nn.Module):
-    """Squeeze-and-Excitation channel attention."""
 
     def __init__(self, channels: int, reduction: int = 8):
         super().__init__()
@@ -92,7 +175,6 @@ class SEBlock(nn.Module):
 
 
 class ResBlock(nn.Module):
-    """Residual block with optional SE attention."""
 
     def __init__(self, in_ch: int, out_ch: int, stride: int = 1, use_se: bool = True):
         super().__init__()
@@ -120,11 +202,6 @@ class ResBlock(nn.Module):
 
 
 class StrongCNN(nn.Module):
-    """
-    Stronger CNN backbone with residual blocks and SE attention.
-    Less aggressive early downsampling to preserve spatial detail
-    (important for corridor navigation and distant target detection).
-    """
 
     def __init__(self, in_channels: int = 3):
         super().__init__()
@@ -167,10 +244,6 @@ class StrongCNN(nn.Module):
 
 
 class ActorCriticLateFusion(nn.Module):
-    """
-    Late Fusion Actor-Critic for PPO:
-    StrongCNN(img) + MLP(vars) -> concat -> shared FC -> actor + critic heads
-    """
 
     def __init__(
         self,
@@ -184,7 +257,6 @@ class ActorCriticLateFusion(nn.Module):
 
         self.cnn = StrongCNN(in_channels=in_channels)
 
-        # Infer CNN output dim automatically
         with torch.no_grad():
             dummy = torch.zeros(1, in_channels, img_h, img_w)
             cnn_dim = self.cnn(dummy).shape[1]
@@ -206,30 +278,24 @@ class ActorCriticLateFusion(nn.Module):
 
         fused_dim = 128 + 64  # 192
 
-        # Shared feature layer
         self.shared_fc = nn.Sequential(
             nn.Linear(fused_dim, 256),
             nn.ReLU(inplace=True),
         )
 
-        # Actor head (policy)
         self.actor = nn.Linear(256, action_size)
 
-        # Critic head (value function)
         self.critic = nn.Linear(256, 1)
 
-        # Initialize actor/critic heads
         self._initialize_heads()
 
     def _initialize_heads(self):
-        """Initialize actor/critic head weights."""
         nn.init.orthogonal_(self.actor.weight, gain=0.01)
         nn.init.zeros_(self.actor.bias)
         nn.init.orthogonal_(self.critic.weight, gain=1.0)
         nn.init.zeros_(self.critic.bias)
 
     def forward(self, img, vars_):
-        """Forward pass through shared backbone."""
         img_feat = self.img_fc(self.cnn(img))
         vars_feat = self.vars_mlp(vars_)
         fused = torch.cat([img_feat, vars_feat], dim=1)
@@ -237,14 +303,6 @@ class ActorCriticLateFusion(nn.Module):
         return features
 
     def get_action_and_value(self, img, vars_, action=None):
-        """
-        Get action, log prob, entropy, and value.
-
-        Args:
-            img: image observation tensor
-            vars_: game variables tensor
-            action: optional action to compute log prob for (used in training)
-        """
         features = self.forward(img, vars_)
 
         logits = self.actor(features)
@@ -258,14 +316,11 @@ class ActorCriticLateFusion(nn.Module):
         return action, probs.log_prob(action), probs.entropy(), value.squeeze(-1)
 
     def get_value(self, img, vars_):
-        """Get only the value estimate (used for GAE computation)."""
         features = self.forward(img, vars_)
         return self.critic(features).squeeze(-1)
 
 
 class FrameStackRGB:
-    """Maintains a stack of recent RGB frames for temporal context."""
-
     def __init__(self, stack_size, frame_shape, channels=RGB_CHANNELS):
         self.stack_size = stack_size
         self.channels = channels
@@ -281,17 +336,13 @@ class FrameStackRGB:
             )
 
     def push(self, frame):
-        """Add a new frame. `frame` shape: (C, H, W) from preprocess_rgb."""
         self.frames.append(frame)
 
     def get(self):
-        """Return stacked frames as (FRAME_STACK_SIZE * C, H, W)."""
         return np.concatenate(list(self.frames), axis=0)
 
 
 class RolloutBuffer:
-    """Buffer to store rollout data for PPO training."""
-
     def __init__(self):
         self.states_img = []
         self.states_vars = []
@@ -320,7 +371,6 @@ class RolloutBuffer:
         self.values.clear()
 
     def compute_returns_and_advantages(self, last_value, gamma, gae_lambda):
-        """Compute returns and GAE advantages."""
         rewards = np.array(self.rewards)
         dones = np.array(self.dones)
         values = np.array(self.values + [last_value])
@@ -339,7 +389,6 @@ class RolloutBuffer:
         return returns, advantages
 
     def get_batches(self, batch_size, returns, advantages):
-        """Generate mini-batches for PPO update."""
         n_samples = len(self.states_img)
         indices = np.random.permutation(n_samples)
 
@@ -358,8 +407,6 @@ class RolloutBuffer:
 
 
 class PPOAgent:
-    """PPO Agent with Late Fusion architecture for ViZDoom."""
-
     def __init__(
         self,
         action_size,
@@ -409,14 +456,6 @@ class PPOAgent:
         self.buffer = RolloutBuffer()
 
     def get_action(self, state_img, state_vars, deterministic=False):
-        """
-        Get action for the given state.
-
-        Args:
-            state_img: preprocessed image observation (frame-stacked)
-            state_vars: preprocessed game variables
-            deterministic: if True, return most probable action
-        """
         img = np.expand_dims(state_img, axis=0)
         vars_ = np.expand_dims(state_vars, axis=0)
         img_t = torch.from_numpy(img).float().to(DEVICE)
@@ -434,11 +473,9 @@ class PPOAgent:
                 return action.item(), log_prob.item(), value.item()
 
     def store_transition(self, state_img, state_vars, action, reward, done, log_prob, value):
-        """Store a transition in the rollout buffer."""
         self.buffer.add(state_img, state_vars, action, reward, done, log_prob, value)
 
     def get_last_value(self, state_img, state_vars):
-        """Get value estimate for the last state (for GAE computation)."""
         img = np.expand_dims(state_img, axis=0)
         vars_ = np.expand_dims(state_vars, axis=0)
         img_t = torch.from_numpy(img).float().to(DEVICE)
@@ -446,8 +483,17 @@ class PPOAgent:
         with torch.no_grad():
             return self.network.get_value(img_t, vars_t).item()
 
+    def update_entropy_coef(self, progress):
+        self.entropy_coef = entropy_coef_start + \
+            (entropy_coef_end - entropy_coef_start) * progress
+
+    def update_lr(self, progress):
+        lr = learning_rate * 0.5 * (1.0 + math.cos(math.pi * progress))
+        for param_group in self.optimizer.param_groups:
+            param_group["lr"] = lr
+        return lr
+
     def train(self):
-        """Perform PPO update using collected rollout data."""
         # Get last value for GAE
         last_img = self.buffer.states_img[-1] if self.buffer.states_img else np.zeros(
             (INPUT_CHANNELS, *resolution))
@@ -462,6 +508,9 @@ class PPOAgent:
 
         advantages = (advantages - advantages.mean()) / \
             (advantages.std() + 1e-8)
+
+        # Store old values for value clipping
+        old_values = np.array(self.buffer.values)
 
         total_policy_loss = 0
         total_value_loss = 0
@@ -492,7 +541,9 @@ class PPOAgent:
                     ratio, 1 - self.clip_epsilon, 1 + self.clip_epsilon) * batch_advantages_t
                 policy_loss = -torch.min(surr1, surr2).mean()
 
-                value_loss = nn.functional.mse_loss(values, batch_returns_t)
+                value_loss_unclipped = (values - batch_returns_t) ** 2
+                value_loss = 0.5 * value_loss_unclipped.mean()
+
                 entropy_loss = -entropy.mean()
 
                 loss = policy_loss + self.value_coef * \
@@ -525,7 +576,6 @@ class PPOAgent:
 
 
 def test(game, agent, actions, num_episodes=100):
-    """Run test episodes and report results."""
     print("\nTesting...")
     test_scores = []
     frame_stack = FrameStackRGB(FRAME_STACK_SIZE, resolution, RGB_CHANNELS)
@@ -535,7 +585,7 @@ def test(game, agent, actions, num_episodes=100):
         frame_stack.reset()
         while not game.is_episode_finished():
             game_state = game.get_state()
-            frame = preprocess_rgb(game_state.screen_buffer, resolution)
+            frame = preprocess_rgb_normalized(game_state.screen_buffer)
             frame_stack.push(frame)
             state_img = frame_stack.get()
             state_vars = preprocess_vars_health(game_state.game_variables, NUM_VARS)
@@ -552,11 +602,6 @@ def test(game, agent, actions, num_episodes=100):
 
 
 def run(game, agent, actions, num_epochs, steps_per_epoch, frame_repeat):
-    """
-    Main training loop using PPO with late fusion.
-
-    Collects rollouts for steps_per_epoch steps, then performs a PPO update.
-    """
     start_time = time()
     best_mean_reward = float("-inf")
 
@@ -567,25 +612,65 @@ def run(game, agent, actions, num_epochs, steps_per_epoch, frame_repeat):
         print(f"Epoch #{epoch + 1}")
         print(f"{'='*50}")
 
+        progress = epoch / max(num_epochs - 1, 1)
+        current_lr = agent.update_lr(progress)
+        agent.update_entropy_coef(progress)
+        print(f"  LR: {current_lr:.6f}  Entropy coef: {agent.entropy_coef:.4f}")
+
         game.new_episode()
         frame_stack.reset()
         train_scores = []
         episode_reward = 0
+        prev_health = 100.0   # starting health
+        prev_kills = 0        # starting kill count
+        taking_damage = False # track if agent is under fire
 
         for step in trange(steps_per_epoch, desc="Collecting rollout", leave=False):
             game_state = game.get_state()
-            frame = preprocess_rgb(game_state.screen_buffer, resolution)
+            frame = preprocess_rgb_normalized(game_state.screen_buffer)
             frame_stack.push(frame)
             state_img = frame_stack.get()
             state_vars = preprocess_vars_health(game_state.game_variables, NUM_VARS)
 
             action, log_prob, value = agent.get_action(state_img, state_vars)
 
-            reward = game.make_action(actions[action], frame_repeat)
+            raw_reward = game.make_action(actions[action], frame_repeat)
             done = game.is_episode_finished()
 
-            episode_reward += reward
-            agent.store_transition(state_img, state_vars, action, reward,
+            shaped_reward = raw_reward * DISTANCE_REWARD_SCALE
+
+            if not done:
+                gv = game.get_state().game_variables
+                current_health = gv[0]
+                current_kills = gv[1]  # killcount
+
+                # penalize health loss (encourages taking cover)
+                health_delta = current_health - prev_health
+                if health_delta < 0:
+                    shaped_reward += health_delta * HEALTH_LOSS_PENALTY
+                    taking_damage = True
+                else:
+                    taking_damage = False
+
+                # larger reward for kills (incentive to clear rooms)
+                new_kills = current_kills - prev_kills
+                if new_kills > 0:
+                    shaped_reward += new_kills * KILL_REWARD
+
+                # penalize if room not cleared
+                action_vec = actions[action]
+                is_moving_forward = action_vec[3] == 1
+                room_kills = current_kills % ENEMIES_PER_ROOM  # kills within current room
+                if is_moving_forward and taking_damage and room_kills < ENEMIES_PER_ROOM:
+                    shaped_reward -= ADVANCE_WHILE_ENEMIES_PENALTY
+
+                shaped_reward += SURVIVAL_BONUS
+
+                prev_health = current_health
+                prev_kills = current_kills
+
+            episode_reward += raw_reward  # track raw reward for logging
+            agent.store_transition(state_img, state_vars, action, shaped_reward,
                                    done, log_prob, value)
 
             if done:
@@ -593,6 +678,9 @@ def run(game, agent, actions, num_epochs, steps_per_epoch, frame_repeat):
                 episode_reward = 0
                 game.new_episode()
                 frame_stack.reset()
+                prev_health = 100.0
+                prev_kills = 0
+                taking_damage = False
 
         # PPO update
         stats = agent.train()
@@ -627,8 +715,8 @@ def run(game, agent, actions, num_epochs, steps_per_epoch, frame_repeat):
 if __name__ == "__main__":
     # Initialize game and actions
     game = create_simple_game()
-    n = game.get_available_buttons_size()
-    actions = [list(a) for a in it.product([0, 1], repeat=n)]
+
+    actions = get_deadly_corridor_actions()
 
     print(f"Number of actions: {len(actions)}")
 
@@ -640,7 +728,7 @@ if __name__ == "__main__":
         gamma=gamma,
         gae_lambda=gae_lambda,
         clip_epsilon=clip_epsilon,
-        entropy_coef=entropy_coef,
+        entropy_coef=entropy_coef_start,
         value_coef=value_coef,
         max_grad_norm=max_grad_norm,
         ppo_epochs=ppo_epochs,
@@ -677,7 +765,7 @@ if __name__ == "__main__":
         while not game.is_episode_finished():
             game_state = game.get_state()
             assert game_state is not None
-            frame = preprocess_rgb(game_state.screen_buffer, resolution)
+            frame = preprocess_rgb_normalized(game_state.screen_buffer)
             frame_stack.push(frame)
             state_img = frame_stack.get()
             state_vars = preprocess_vars_health(game_state.game_variables, NUM_VARS)
