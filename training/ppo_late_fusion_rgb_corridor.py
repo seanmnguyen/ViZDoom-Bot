@@ -49,7 +49,9 @@ from torch.distributions import Categorical
 from tqdm import trange
 
 import vizdoom as vzd
-from utils import preprocess_rgb, preprocess_vars_health, SCENARIO_PATH, RESOLUTION, get_num_game_variables
+from utils import preprocess_rgb, SCENARIO_PATH, RESOLUTION, get_num_game_variables
+
+NET_NUM_VARS = 2
 
 learning_rate = 2.5e-4
 gamma = 0.99            # discount factor
@@ -101,7 +103,18 @@ NUM_VARS = get_num_game_variables(config_file_path)
 
 print(config_file_path)
 print(f"Using device: {DEVICE}")
-print(f"Number of game variables: {NUM_VARS}")
+print(f"Number of game variables (cfg): {NUM_VARS}")
+print(f"Number of network input vars: {NET_NUM_VARS}")
+
+# total enemies in deadly_corridor
+TOTAL_ENEMIES = 6
+
+
+def preprocess_vars_corridor(game_variables, kills=0):
+    health = float(game_variables[0]) if len(game_variables) >= 1 else 0.0
+    health_norm = np.clip(health, 0.0, 100.0) / 100.0
+    kills_norm = np.clip(float(kills), 0.0, float(TOTAL_ENEMIES)) / float(TOTAL_ENEMIES)
+    return np.array([health_norm, kills_norm], dtype=np.float32)
 
 def get_deadly_corridor_actions():
     actions = [
@@ -157,6 +170,21 @@ def preprocess_rgb_normalized(img, res=resolution):
     x = preprocess_rgb(img, res)
     x /= 255.0
     return x
+
+
+class SpatialAttention(nn.Module):
+
+    def __init__(self, kernel_size: int = 7):
+        super().__init__()
+        padding = kernel_size // 2
+        self.conv = nn.Conv2d(2, 1, kernel_size=kernel_size, padding=padding, bias=False)
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        combined = torch.cat([avg_out, max_out], dim=1)
+        attn = torch.sigmoid(self.conv(combined))
+        return x * attn
 
 
 class SEBlock(nn.Module):
@@ -230,7 +258,9 @@ class StrongCNN(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        self.pool = nn.AdaptiveAvgPool2d((4, 4))
+        self.spatial_attn = SpatialAttention(kernel_size=7)
+
+        self.pool = nn.AdaptiveAvgPool2d((4, 8))
 
     def forward(self, x):
         x = self.stem(x)
@@ -238,8 +268,9 @@ class StrongCNN(nn.Module):
         x = self.stage2(x)
         x = self.stage3(x)
         x = self.context(x)
+        x = self.spatial_attn(x) 
         x = self.pool(x)
-        x = torch.flatten(x, 1)  # (B, 128*4*4 = 2048)
+        x = torch.flatten(x, 1)
         return x
 
 
@@ -262,9 +293,10 @@ class ActorCriticLateFusion(nn.Module):
             cnn_dim = self.cnn(dummy).shape[1]
 
         self.img_fc = nn.Sequential(
-            nn.Linear(cnn_dim, 256),
+            nn.Linear(cnn_dim, 512),
             nn.ReLU(inplace=True),
-            nn.Linear(256, 128),
+            nn.Dropout(0.1),
+            nn.Linear(512, 256),
             nn.ReLU(inplace=True),
         )
 
@@ -276,17 +308,16 @@ class ActorCriticLateFusion(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        fused_dim = 128 + 64  # 192
+        fused_dim = 256 + 64  # 320
 
         self.shared_fc = nn.Sequential(
             nn.Linear(fused_dim, 256),
             nn.ReLU(inplace=True),
+            nn.Dropout(0.05),
         )
 
         self.actor = nn.Linear(256, action_size)
-
         self.critic = nn.Linear(256, 1)
-
         self._initialize_heads()
 
     def _initialize_heads(self):
@@ -410,7 +441,7 @@ class PPOAgent:
     def __init__(
         self,
         action_size,
-        num_vars=NUM_VARS,
+        num_vars=NET_NUM_VARS,
         lr=3e-4,
         gamma=0.99,
         gae_lambda=0.95,
@@ -498,7 +529,7 @@ class PPOAgent:
         last_img = self.buffer.states_img[-1] if self.buffer.states_img else np.zeros(
             (INPUT_CHANNELS, *resolution))
         last_vars = self.buffer.states_vars[-1] if self.buffer.states_vars else np.zeros(
-            (NUM_VARS,))
+            (NET_NUM_VARS,))
         last_value = self.get_last_value(
             last_img, last_vars) if not self.buffer.dones[-1] else 0.0
 
@@ -583,14 +614,19 @@ def test(game, agent, actions, num_episodes=100):
     for _ in trange(num_episodes, leave=False):
         game.new_episode()
         frame_stack.reset()
+        test_kills = 0
         while not game.is_episode_finished():
             game_state = game.get_state()
             frame = preprocess_rgb_normalized(game_state.screen_buffer)
             frame_stack.push(frame)
             state_img = frame_stack.get()
-            state_vars = preprocess_vars_health(game_state.game_variables, NUM_VARS)
+            state_vars = preprocess_vars_corridor(game_state.game_variables, kills=test_kills)
             action = agent.get_action(state_img, state_vars, deterministic=True)
             game.make_action(actions[action], frame_repeat)
+
+            if not game.is_episode_finished():
+                gv = game.get_state().game_variables
+                test_kills = gv[1] if len(gv) > 1 else 0
         test_scores.append(game.get_total_reward())
 
     test_scores = np.array(test_scores)
@@ -630,7 +666,7 @@ def run(game, agent, actions, num_epochs, steps_per_epoch, frame_repeat):
             frame = preprocess_rgb_normalized(game_state.screen_buffer)
             frame_stack.push(frame)
             state_img = frame_stack.get()
-            state_vars = preprocess_vars_health(game_state.game_variables, NUM_VARS)
+            state_vars = preprocess_vars_corridor(game_state.game_variables, kills=prev_kills)
 
             action, log_prob, value = agent.get_action(state_img, state_vars)
 
@@ -723,7 +759,7 @@ if __name__ == "__main__":
     # Initialize PPO agent
     agent = PPOAgent(
         action_size=len(actions),
-        num_vars=NUM_VARS,
+        num_vars=NET_NUM_VARS,
         lr=learning_rate,
         gamma=gamma,
         gae_lambda=gae_lambda,
@@ -762,18 +798,24 @@ if __name__ == "__main__":
     for episode_num in range(episodes_to_watch):
         game.new_episode()
         frame_stack.reset()
+        watch_kills = 0
         while not game.is_episode_finished():
             game_state = game.get_state()
             assert game_state is not None
             frame = preprocess_rgb_normalized(game_state.screen_buffer)
             frame_stack.push(frame)
             state_img = frame_stack.get()
-            state_vars = preprocess_vars_health(game_state.game_variables, NUM_VARS)
+            state_vars = preprocess_vars_corridor(game_state.game_variables,
+                                                  kills=watch_kills)
             action = agent.get_action(state_img, state_vars, deterministic=True)
 
             game.set_action(actions[action])
             for _ in range(frame_repeat):
                 game.advance_action()
+
+            if not game.is_episode_finished():
+                gv = game.get_state().game_variables
+                watch_kills = gv[1] if len(gv) > 1 else 0
 
         sleep(1.0)
         score = game.get_total_reward()
