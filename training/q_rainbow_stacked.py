@@ -49,7 +49,7 @@ SCENARIO_NAME = "defend_the_center"
 # SCENARIO_NAME = "deadly_corridor"
 config_file_path = os.path.join(SCENARIO_PATH, f"{SCENARIO_NAME}.cfg")
 
-MODEL_TYPE = os.path.splitext(os.path.basename(__file__))[0] + "3"
+MODEL_TYPE = os.path.splitext(os.path.basename(__file__))[0] + "_nostack"
 # MODEL_TYPE = os.path.splitext(os.path.basename(__file__))[0]
 model_savefile = f"../models/{SCENARIO_NAME}/{MODEL_TYPE}.pth"
 os.makedirs(os.path.dirname(model_savefile), exist_ok=True)
@@ -200,8 +200,8 @@ STACKED_CHANNELS = FRAME_C * FRAME_STACK_SIZE
 
 # Training knobs
 RESOLUTION = (96, 128)
-TRAIN_EPOCHS = 125
-LEARNING_RATE = 0.00012
+TRAIN_EPOCHS = 75
+LEARNING_RATE = 0.00025
 
 # With lazy stacking, you can usually go back to 12 safely.
 FRAME_REPEAT = 12

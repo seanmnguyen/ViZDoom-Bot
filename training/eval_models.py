@@ -26,6 +26,7 @@ from utils import *
 import model_registry as MODELS
 
 import q_rainbow_stacked as rainbow_lazy_mod
+import ppo_late_fusion_rgb_corridor
 from ppo_cnn_gray import FrameStack as PPOFrameStack
 
 # ---------- GLOBALS (same as demo.py; only used to construct agents) ----------
@@ -105,20 +106,6 @@ def parse_cli():
     return args, agent_builder, model_path
 
 
-def infer_expected_num_vars(agent, game: vzd.DoomGame) -> int:
-    """
-    Prefer the model's declared num_vars if present (avoids LayerNorm shape mismatches),
-    otherwise fall back to demo.py behavior.
-    """
-    qn = getattr(agent, "q_net", None)
-    if qn is not None and hasattr(qn, "num_vars"):
-        try:
-            return int(qn.num_vars)
-        except Exception:
-            pass
-    return len(game.get_available_game_variables())
-
-
 @torch.no_grad()
 def evaluate(game: vzd.DoomGame, agent, actions, *, model_type: str, resolution, episodes: int, visible_window: bool, use_frame_stack: bool, frame_stack):
     # Set eval mode if supported
@@ -172,8 +159,12 @@ def evaluate(game: vzd.DoomGame, agent, actions, *, model_type: str, resolution,
                     state_img = frame_stack.get()
 
             if model_type in MODELS.PPO_MODELS:
-                if model_type in MODELS.LATE_FUSION_PPO_MODELS:
-                    state_vars = preprocess_vars_safe(gs.game_variables, expected_num_vars)
+                if model_type in MODELS.PPO_STATE_VAR_MODELS:
+                    # TODO: special exception for this model since it uses custom actions
+                    if model_type == "ppo_late_fusion_rgb_corridor":
+                        state_vars = ppo_late_fusion_rgb_corridor.preprocess_vars_corridor(gs.game_variables)
+                    else:
+                        state_vars = preprocess_vars_safe(gs.game_variables, expected_num_vars)
                     a = agent.get_action(state_img, state_vars, deterministic=True)
                 else:
                     a = agent.get_action(state_img, deterministic=True)
@@ -235,7 +226,6 @@ if __name__ == "__main__":
     game.set_mode(vzd.Mode.ASYNC_PLAYER if visible_window else vzd.Mode.PLAYER)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
 
-    # Match demo.py's screen format selection, but without forcing HUD rendering in headless
     # Match demo.py's screen format selection, but allow AUTO for modules that self-toggle RGB/Gray
     color_mode = MODELS.COLOR_BY_MODEL[args.model_type]
     if color_mode == MODELS.RGB:
@@ -264,8 +254,10 @@ if __name__ == "__main__":
     # Build action space
     n = game.get_available_buttons_size()
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
+    # TODO: special exception for this model since it uses custom actions
+    if args.model_type == "ppo_late_fusion_rgb_corridor":
+        actions = ppo_late_fusion_rgb_corridor.get_deadly_corridor_actions()
 
-    # Build agent (same constructor conventions as demo.py)
     # Build agent
     if args.model_type in MODELS.PPO_MODELS:
         agent = AgentBuilder(action_size=len(actions), load_model_path=model_path)
@@ -298,19 +290,12 @@ if __name__ == "__main__":
     # Set up frame stacking if needed
     use_frame_stack = args.model_type in MODELS.FRAME_STACK_MODELS
     if use_frame_stack:
-        if args.model_type == MODELS.LAZY_STACK_MODULE_BY_MODEL:
+        if args.model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL:
             # Uses its own stacker: stores uint8 frames (C,H,W) and concatenates to (C*K,H,W).
             frame_stack = rainbow_lazy_mod.FrameStack(rainbow_lazy_mod.FRAME_STACK_SIZE, rainbow_lazy_mod.FRAME_C, resolution)
-        elif color_mode == MODELS.GRAYSCALE:
-            if MODELS.PPOFrameStackGray is None:
-                raise RuntimeError("PPOFrameStackGray import failed, but frame stacking was requested.")
-            frame_stack = MODELS.PPOFrameStackGray(MODELS.PPO_FRAME_STACK_SIZE_GRAY, resolution)
-        elif color_mode == MODELS.RGB:
-            if MODELS.PPOFrameStackRGB is None:
-                raise RuntimeError("PPOFrameStackRGB import failed, but frame stacking was requested.")
-            frame_stack = MODELS.PPOFrameStackRGB(MODELS.PPO_FRAME_STACK_SIZE_RGB, resolution)
         else:
-            raise ValueError(f"Unsupported color mode {color_mode} for frame stacking.")
+            FrameStack = MODELS.FRAME_STACK_MODELS[args.model_type]
+            frame_stack = FrameStack(MODELS.FRAME_STACK_SIZE[args.model_type], resolution)
     else:
         frame_stack = None
 

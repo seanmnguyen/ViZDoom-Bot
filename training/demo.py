@@ -284,7 +284,7 @@ if __name__ == "__main__":
 
             # Action selection
             if args.model_type in MODELS.PPO_MODELS:
-                if args.model_type in MODELS.LATE_FUSION_PPO_MODELS:
+                if args.model_type in MODELS.PPO_STATE_VAR_MODELS:
                     state_vars = preprocess_vars_safe(gs.game_variables, expected_num_vars)
                     a = agent.get_action(state_img, state_vars, deterministic=True)
                 else:

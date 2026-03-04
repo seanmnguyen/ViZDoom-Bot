@@ -14,6 +14,7 @@ Implements (Rainbow core, minus recurrence):
 import itertools as it
 import os
 import random
+import argparse
 from dataclasses import dataclass
 from time import sleep, time
 from typing import Optional, Tuple, List
@@ -31,11 +32,15 @@ from utils import *  # use shared constants + preprocess functions
 # -----------------------------------------------------------------------------
 # Scenario / save naming (README convention)
 # -----------------------------------------------------------------------------
-SCENARIO_NAME = "defend_the_center"
+SCENARIO_NAME = "deadly_corridor"
+preprocess_vars = preprocess_vars_health # ONLY USE FOR DEADLY_CORRIDOR
 config_file_path = os.path.join(SCENARIO_PATH, f"{SCENARIO_NAME}.cfg")
 
 MODEL_TYPE = os.path.splitext(os.path.basename(__file__))[0]
-model_savefile = f"../models/{SCENARIO_NAME}/{MODEL_TYPE}.pth"
+model_savefile = f"../models/{SCENARIO_NAME}/{MODEL_TYPE}3.pth"
+# Save full-training checkpoint separately from plain weights
+ckpt_savefile = model_savefile.replace(".pth", "_ckpt.pth")
+resume_training = False  # set True to resume from ckpt_savefile when it exists
 os.makedirs(os.path.dirname(model_savefile), exist_ok=True)
 
 save_model = True
@@ -69,6 +74,7 @@ TARGET_UPDATE_EVERY = 1000  # optimizer steps (not env steps)
 GRAD_CLIP_NORM = 10.0
 
 # start learning after some experience
+BATCH_SIZE = 128
 LEARNING_STARTS = 2 * BATCH_SIZE
 TRAIN_EVERY = 1
 UPDATES_PER_TRAIN = 1
@@ -76,7 +82,6 @@ UPDATES_PER_TRAIN = 1
 NUM_VARS = NUM_VARS = get_num_game_variables(config_file_path)
 
 # TODO: ADJUST SCALING
-BATCH_SIZE = 128
 RESOLUTION = (96, 128)
 TRAIN_EVERY = 1
 UPDATES_PER_TRAIN = 1
@@ -801,11 +806,11 @@ def test(game, agent: DQNAgent, actions):
     )
 
 
-def run(game, agent: DQNAgent, actions):
+def run(game, agent: DQNAgent, actions, start_epoch: int=0, ckpt_path: Optional[str]=None, start_global_step: int=0):
     start_time = time()
-    global_step = 0
+    global_step = start_global_step
 
-    for epoch in range(TRAIN_EPOCHS):
+    for epoch in range(start_epoch, TRAIN_EPOCHS):
         print(f"\nEpoch #{epoch + 1}")
         game.new_episode()
         agent.begin_episode()
@@ -871,6 +876,16 @@ def run(game, agent: DQNAgent, actions):
             print("Saving model to:", model_savefile)
             torch.save(agent.q_net.state_dict(), model_savefile)
 
+            if ckpt_path is not None:
+                save_checkpoint(
+                    ckpt_path,
+                    agent,
+                    extra={
+                        "epoch": epoch,
+                        "global_step": global_step,
+                    },
+                )
+
         elapsed = (time() - start_time) / 60.0
         print(f"Total elapsed time: {elapsed:.2f} minutes")
 
@@ -906,6 +921,103 @@ def watch_trained(agent: DQNAgent, actions):
     print(f"-----Average Score: {total / EPISODES_TO_WATCH:.2f}-----")
     game.close()
 
+# -----------------------------------------------------------------------------
+# Checkpointing
+# -----------------------------------------------------------------------------
+def save_checkpoint(path, agent, extra=None):
+    ckpt = {
+        "q_net": agent.q_net.state_dict(),
+        "target_net": agent.target_net.state_dict(),
+        "opt": agent.opt.state_dict(),
+        "learn_step": agent.learn_step,
+        "beta": agent.beta,
+        "scaler": agent.scaler.state_dict() if getattr(agent, "use_amp", False) else None,
+        "rng": {
+            "python": random.getstate(),
+            "numpy": np.random.get_state(),
+            "torch": torch.get_rng_state(),
+            "cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+        },
+    }
+    if extra:
+        ckpt.update(extra)
+    torch.save(ckpt, path)
+
+def load_checkpoint(path, agent):
+    ckpt = torch.load(path, map_location=DEVICE)
+
+    agent.q_net.load_state_dict(ckpt["q_net"])
+    agent.target_net.load_state_dict(ckpt.get("target_net", ckpt["q_net"]))
+    agent.opt.load_state_dict(ckpt["opt"])
+
+    agent.learn_step = ckpt.get("learn_step", 0)
+    agent.beta = ckpt.get("beta", PER_BETA_START)
+
+    if ckpt.get("scaler") is not None and getattr(agent, "use_amp", False):
+        agent.scaler.load_state_dict(ckpt["scaler"])
+
+    rng = ckpt.get("rng")
+    if rng:
+        random.setstate(rng["python"])
+        np.random.set_state(rng["numpy"])
+        torch.set_rng_state(rng["torch"])
+        if torch.cuda.is_available() and rng.get("cuda") is not None:
+            torch.cuda.set_rng_state_all(rng["cuda"])
+
+    return ckpt
+
+def parse_cli():
+    '''
+    Parse command line arguments.
+
+    Returns: args, agent_builder, model_path
+    '''
+    parser = argparse.ArgumentParser(
+        description="Train/evaluate ViZDoom agents."
+    )
+
+    parser.add_argument(
+        "-rt", "--resume_training",
+        type=str2bool,
+        default=False,
+        metavar="BOOL",
+        help="Resume training (True/False)."
+    )
+
+    parser.add_argument(
+        "-ms", "--model_savefile",
+        type=str,
+        default=None,
+        help="Path to model weights and checkpoint for saving. Defaults to ../models/<model_type>.pth"
+    )
+
+    parser.add_argument(
+        "-lm", "--load_modelfile",
+        type=str,
+        default=None,
+        help="Path to model checkpoint for loading. Defaults to ../models/<model_type>.pth"
+    )
+
+    args = parser.parse_args()
+
+    savefile = f"../models/{SCENARIO_NAME}/{args.model_savefile}.pth" if args.model_savefile else model_savefile
+    checkpointfile = model_savefile.replace(".pth", "_ckpt.pth")
+
+    return args.resume_training, savefile, checkpointfile, args.load_modelfile
+
+def str2bool(v):
+    """Parse bools from CLI strings."""
+    if isinstance(v, bool):
+        return v
+    v = v.strip().lower()
+    if v in {"true", "t", "1", "yes", "y"}:
+        return True
+    if v in {"false", "f", "0", "no", "n"}:
+        return False
+    raise argparse.ArgumentTypeError(
+        f"Invalid boolean value: '{v}'. Use True/False."
+    )
+
 
 # -----------------------------------------------------------------------------
 # Main
@@ -928,6 +1040,8 @@ if __name__ == "__main__":
     print("MODEL_SAVEFILE:", model_savefile)
     print("Rainbow: ATOMS=", ATOMS, "V_MIN=", V_MIN, "V_MAX=", V_MAX, "N_STEP=", N_STEP)
 
+    resume_training, model_savefile, ckpt_savefile, load_ckpt = parse_cli()
+
     game = create_simple_game(visible=False, async_player=False)
 
     n = game.get_available_buttons_size()
@@ -941,14 +1055,34 @@ if __name__ == "__main__":
         memory_size=REPLAY_MEMORY_SIZE,
     )
 
-    if load_model and os.path.exists(model_savefile):
+    start_epoch = 0
+    start_global_step = 0
+
+    # Prefer checkpoint resume (full training state)
+    if resume_training and os.path.exists(ckpt_savefile):
+        print("Resuming from checkpoint:", ckpt_savefile)
+        ckpt = load_checkpoint(load_ckpt, agent)
+        start_epoch = int(ckpt.get("epoch", -1)) + 1
+        start_global_step = int(ckpt.get("global_step", -1)) + 1
+        print(f"Resumed at epoch={start_epoch}, learn_step={agent.learn_step}, beta={agent.beta:.3f}")
+
+    # Fallback: weights-only load (good for inference, not a true resume)
+    elif load_model and os.path.exists(model_savefile):
         print("Loading weights from:", model_savefile)
         sd = torch.load(model_savefile, map_location=DEVICE)
         agent.q_net.load_state_dict(sd)
         agent.update_target(hard=True)
 
     if not skip_learning:
-        run(game, agent, actions)
+        try:
+            run(game, agent, actions, start_epoch=start_epoch, ckpt_path=ckpt_savefile, start_global_step=start_global_step)
+        finally:
+            # last-chance checkpoint (e.g., KeyboardInterrupt)
+            if save_model:
+                save_checkpoint(
+                    ckpt_savefile,
+                    agent,
+                )
         print("======================================")
         print("Training finished. Time to watch!")
     else:
