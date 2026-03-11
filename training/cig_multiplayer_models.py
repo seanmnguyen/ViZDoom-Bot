@@ -8,10 +8,13 @@ import numpy as np
 import torch
 import vizdoom as vzd
 
-import model_registry as MODELS
-import q_rainbow_stacked as rainbow_lazy_mod
 from utils import *
+import model_registry as MODELS
 
+import q_rainbow_stacked as rainbow_lazy_mod
+import ppo_late_fusion_rgb_corridor
+import ppo_film_factorized_gray
+from ppo_cnn_gray import FrameStack as PPOFrameStack
 
 def build_args():
     ap = argparse.ArgumentParser()
@@ -27,35 +30,6 @@ def build_args():
     ap.add_argument("--frame_repeat", type=int, default=12)  # match your training
     return ap.parse_args()
 
-def configure_interface_like_defend_center(game: vzd.DoomGame, *, model_type: str):
-    """
-    Force the action/vars interface to match your Defend-the-Center-trained models:
-      - 3 buttons (TURN_LEFT, TURN_RIGHT, ATTACK) => 8 actions
-      - vars: AMMO2, HEALTH
-    """
-    # --- Buttons ---
-    game.clear_available_buttons()  # :contentReference[oaicite:5]{index=5}
-    game.add_available_button(vzd.Button.TURN_LEFT)   # :contentReference[oaicite:6]{index=6}
-    game.add_available_button(vzd.Button.TURN_RIGHT)  # :contentReference[oaicite:7]{index=7}
-    game.add_available_button(vzd.Button.ATTACK)      # :contentReference[oaicite:8]{index=8}
-
-    # --- Game variables ---
-    # Only DQN variants use vars in your code; PPO gray is image-only.
-    game.clear_available_game_variables()  # :contentReference[oaicite:9]{index=9}
-    game.add_available_game_variable(vzd.GameVariable.AMMO2)   # :contentReference[oaicite:10]{index=10}
-    game.add_available_game_variable(vzd.GameVariable.HEALTH)  # :contentReference[oaicite:11]{index=11}
-
-    # --- Screen format ---
-    if MODELS.COLOR_BY_MODEL[model_type] == MODELS.RGB:
-        game.set_screen_format(vzd.ScreenFormat.RGB24)
-    elif MODELS.COLOR_BY_MODEL[model_type] == MODELS.GRAYSCALE:
-        game.set_screen_format(vzd.ScreenFormat.GRAY8)
-    elif MODELS.COLOR_BY_MODEL[model_type] == MODELS.AUTO:
-        use_gray = bool(getattr(rainbow_lazy_mod, "USE_GRAYSCALE", False))
-        game.set_screen_format(vzd.ScreenFormat.GRAY8 if use_gray else vzd.ScreenFormat.RGB24)
-    else:
-        raise ValueError("Unknown model_type for screen format")
-
 def main():
     # Uses GPU if available (same as demo.py)
     if torch.cuda.is_available():
@@ -70,8 +44,8 @@ def main():
     color_mode = MODELS.COLOR_BY_MODEL[args.model_type]
 
     game = vzd.DoomGame()
-    game.load_config(os.path.join(vzd.scenarios_path, "cig.cfg"))
-    game.set_doom_map("map01")
+    game.load_config(os.path.join(vzd.scenarios_path, "deathmatch.cfg"))
+    # game.set_doom_map("map01")
 
     # Join host
     game.add_game_args(f"-join {args.join} -port {args.port}")
@@ -82,16 +56,17 @@ def main():
     game.set_window_visible(args.show)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
 
-    # IMPORTANT: make CIG interface compatible with your trained models
-    configure_interface_like_defend_center(game, model_type=model_type)
+    for gv in game.get_available_game_variables():
+        game.add_available_game_variable(gv)
+
     resolution = MODELS.RESOLUTION_BY_MODEL[model_type]
 
     game.init()
 
-    # Build discrete action space (8 actions for 3 binary buttons)
+    # Build discrete action space 
     n_buttons = game.get_available_buttons_size()
     actions = [list(a) for a in it.product([0, 1], repeat=n_buttons)]
-    assert len(actions) == 8, f"Expected 8 actions, got {len(actions)}"
+    print("ACTIONS:", len(actions))
 
     # Build agent
     AgentBuilder = MODELS.AGENT_BY_MODEL[model_type]
@@ -101,9 +76,12 @@ def main():
     batch_size = 128
 
     # Build agent
-    if model_type in MODELS.PPO_MODELS:
+    if args.model_type == "ppo_film_factorized_gray":
+        mapper = MODELS.FactorizedActionMapper(game)
+        agent = AgentBuilder(action_mapper=mapper)
+    elif args.model_type in MODELS.PPO_MODELS:
         agent = AgentBuilder(action_size=len(actions), load_model_path=model_path)
-    elif model_type == "q_rainbow_stacked":
+    elif args.model_type == "q_rainbow_stacked":
         # This agent's constructor does not take load_model/model_weights; load weights manually.
         agent = AgentBuilder(
             action_size=len(actions),
@@ -130,21 +108,14 @@ def main():
         )
 
     # Set up frame stacking if needed
-    use_frame_stack = model_type in MODELS.FRAME_STACK_MODELS
+    use_frame_stack = args.model_type in MODELS.FRAME_STACK_MODELS
     if use_frame_stack:
-        if model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL:
+        if args.model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL:
             # Uses its own stacker: stores uint8 frames (C,H,W) and concatenates to (C*K,H,W).
             frame_stack = rainbow_lazy_mod.FrameStack(rainbow_lazy_mod.FRAME_STACK_SIZE, rainbow_lazy_mod.FRAME_C, resolution)
-        elif color_mode == MODELS.GRAYSCALE:
-            if MODELS.PPOFrameStackGray is None:
-                raise RuntimeError("PPOFrameStackGray import failed, but frame stacking was requested.")
-            frame_stack = MODELS.PPOFrameStackGray(MODELS.PPO_FRAME_STACK_SIZE_GRAY, resolution)
-        elif color_mode == MODELS.RGB:
-            if MODELS.PPOFrameStackRGB is None:
-                raise RuntimeError("PPOFrameStackRGB import failed, but frame stacking was requested.")
-            frame_stack = MODELS.PPOFrameStackRGB(MODELS.PPO_FRAME_STACK_SIZE_RGB, resolution)
         else:
-            raise ValueError(f"Unsupported color mode {color_mode} for frame stacking model {args.model_type}.")
+            FrameStack = MODELS.FRAME_STACK_MODELS[args.model_type]
+            frame_stack = FrameStack(MODELS.FRAME_STACK_SIZE[args.model_type], resolution)
     else:
         frame_stack = None
 
@@ -186,8 +157,14 @@ def main():
 
         # Build observation
         if model_type in MODELS.PPO_MODELS:
-            if model_type in MODELS.LATE_FUSION_PPO_MODELS:
-                state_vars = preprocess_vars_safe(gs.game_variables, expected_num_vars)
+            if model_type in MODELS.PPO_STATE_VAR_MODELS:
+                # TODO: special exception for this model since it uses custom actions
+                if model_type == "ppo_late_fusion_rgb_corridor":
+                    state_vars = ppo_late_fusion_rgb_corridor.preprocess_vars_corridor(gs.game_variables)
+                elif model_type == "ppo_film_factorized_gray":
+                    state_vars = ppo_film_factorized_gray.preprocess_vars_safe_general(gs.game_variables, ppo_film_factorized_gray.NUM_VARS, normalizer=agent.vars_rms, update=False, clip=5.0)
+                else:
+                    state_vars = preprocess_vars_safe(gs.game_variables, expected_num_vars)
                 a = agent.get_action(state_img, state_vars, deterministic=True)
             else:
                 a = agent.get_action(state_img, deterministic=True)

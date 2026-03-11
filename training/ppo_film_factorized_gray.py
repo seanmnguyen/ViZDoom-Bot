@@ -1,42 +1,50 @@
 #!/usr/bin/env python3
 """
-ppo_film_gray.py
+ppo_film_factorized_gray.py
 
-PPO + FiLM-conditioned vision backbone for ViZDoom using GRAYSCALE screen buffer.
+PPO + FiLM-conditioned vision backbone for ViZDoom using GRAYSCALE screen buffer,
+with a FACTORIZED action policy (MultiDiscrete-style heads) instead of enumerating
+all 2^N button combinations.
 
-Why FiLM?
-- Late fusion (concat CNN features + vars MLP) works, but it forces the network to learn
-  "how to use vars" *after* vision features are already computed.
-- FiLM (Feature-wise Linear Modulation) uses vars to *modulate* intermediate vision feature maps:
-      x = (1 + gamma(vars)) * x + beta(vars)
-  which often helps when vars represent "context" (ammo, health, armor, frag count, etc.).
+Why factorized heads?
+- deathmatch.cfg exposes 20 buttons, but enumerating all binary combinations yields 2^20
+  discrete actions (~1,048,576). A single softmax over that many actions is extremely
+  inefficient and (often) untrainable.
+- Several buttons are *_DELTA controls (continuous-ish signed magnitude). Enumerating
+  them as {0,1} is also *semantically wrong*.
+- Factorizing the policy into multiple small categorical heads lets PPO learn each
+  control dimension with a small output layer and combines log-probabilities additively.
 
-Key features:
-- Actor-Critic PPO with GAE(λ) + clipped objective
-- Grayscale preprocessing (GRAY8) via utils.preprocess()
-- Frame stacking (default K=4)
-- Full checkpointing (epoch-level resume): model, optimizer, AMP scaler (if used), RNG states,
-  training counters, best test score, and (optionally) vars normalizer state.
+This script keeps the FiLM backbone from ppo_film_gray.py, but replaces the actor head.
 
-Notes on "full" checkpointing for PPO:
-- PPO is on-policy; we collect fresh rollouts each epoch. Saving the rollout buffer to resume
-  mid-epoch would make checkpoints huge (storing stacked frames). This script resumes cleanly
-  at epoch boundaries.
+Default factorization for deathmatch.cfg buttons:
+- move_fb:  {back, none, forward}                 -> MOVE_BACKWARD / MOVE_FORWARD
+- strafe:   discretized MOVE_LEFT_RIGHT_DELTA     -> {-50,-25,0,25,50}
+- turn:     discretized TURN_LEFT_RIGHT_DELTA     -> {-50,-25,-10,0,10,25,50}
+- look:     discretized LOOK_UP_DOWN_DELTA        -> {-20,-10,0,10,20}
+- attack:   {no, yes}                             -> ATTACK
+- speed:    {walk, run} (optional; default always run = 1)
+- weapon:   {none, w1..w6, next, prev} (optional)
 
-To integrate with demo/eval:
-- Add this agent to model_registry.py and include it in PPO_MODELS and LATE_FUSION_PPO_MODELS-like
-  sets (you may want a new FILM_PPO_MODELS set). If you keep the same PPOAgent interface
-  (get_action(img, vars, deterministic)), demo/eval can treat it like late-fusion PPO.
+You can tune bins at ACTION_* constants below.
+
+Checkpointing:
+- Same "epoch-boundary full checkpointing" style as your other PPO scripts:
+  model + optimizer + scaler + RNG + counters (+ vars RMS stats).
+
+Notes:
+- We deliberately set FiLM layers to identity at init (gamma=0,beta=0) so the network
+  starts as a plain CNN and can learn conditioning gradually.
 """
 
 from __future__ import annotations
 
-import itertools as it
 import os
 import random
 from collections import deque
-from time import sleep, time
-from typing import Optional, Tuple
+from dataclasses import dataclass
+from time import time
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -47,12 +55,13 @@ from torch.distributions import Categorical
 from tqdm import trange
 
 import vizdoom as vzd
-from utils import *  # shared constants + preprocess fns (preprocess for images)
+from utils import *  # shared constants + preprocess(img) + get_num_game_variables
 
 
 # -----------------------------------------------------------------------------
 # Scenario / save naming
 # -----------------------------------------------------------------------------
+# Set this to "deathmatch" for your deathmatch.cfg run.
 SCENARIO_NAME = "deathmatch"
 config_file_path = os.path.join(SCENARIO_PATH, f"{SCENARIO_NAME}.cfg")
 
@@ -65,7 +74,7 @@ os.makedirs(os.path.dirname(checkpoint_savefile), exist_ok=True)
 
 save_model = True
 save_checkpoint = True
-load_checkpoint = True # resume if checkpoint exists
+load_checkpoint = True       # resume if checkpoint exists
 load_model_weights = False   # fallback: load model_savefile weights (no optimizer state)
 skip_learning = False
 
@@ -73,22 +82,22 @@ checkpoint_interval_epochs = 1
 
 
 # -----------------------------------------------------------------------------
-# PPO Hyperparameters
+# PPO Hyperparameters (start here for tuning)
 # -----------------------------------------------------------------------------
 LEARNING_RATE_PPO = 3e-4
 GAMMA = 0.99
 GAE_LAMBDA = 0.95
 CLIP_EPSILON = 0.2
-ENTROPY_COEF = 0.01
+ENTROPY_COEF = 0.015         # deathmatch often benefits from a bit more exploration
 VALUE_COEF = 0.5
 MAX_GRAD_NORM = 0.5
 
 PPO_EPOCHS = 4
-MINI_BATCH_SIZE = 64
+MINI_BATCH_SIZE = 128        # slightly bigger minibatches help in noisy deathmatch
 
 # Rollout collection
-TRAIN_EPOCHS_PPO = 251
-STEPS_PER_EPOCH = 10000
+TRAIN_EPOCHS_PPO = 200
+STEPS_PER_EPOCH = 8192       # bigger rollout reduces variance in PPO updates
 
 # Testing
 TEST_EPISODES = TEST_EPISODES_PER_EPOCH  # from utils.py (default 100)
@@ -96,8 +105,8 @@ TEST_EPISODES = TEST_EPISODES_PER_EPOCH  # from utils.py (default 100)
 # Frame stacking
 FRAME_STACK_SIZE = 4
 
-# Use standardized params from utils.py
-FRAME_REPEAT_EFFECTIVE = FRAME_REPEAT
+# For deathmatch you often want lower frame_repeat than defend_the_center
+FRAME_REPEAT_EFFECTIVE = 6   # try 4 or 6 for smoother aiming
 RESOLUTION_EFFECTIVE = RESOLUTION
 
 # Game vars (scenario-specific)
@@ -113,7 +122,7 @@ if torch.cuda.is_available():
 else:
     DEVICE = torch.device("cpu")
 
-USE_AMP = torch.cuda.is_available()
+USE_AMP = (DEVICE.type == "cuda")
 SCALER = torch.amp.GradScaler(DEVICE, enabled=USE_AMP)
 
 
@@ -178,13 +187,13 @@ def preprocess_vars_safe_general(
 ) -> np.ndarray:
     """
     Compatibility layer:
-    - If expected <= 2, preserves legacy defend_the_center mapping (health/ammo scaling).
+    - If expected <= 2, preserves legacy defend_the_center mapping via utils.preprocess_vars_safe
     - Else: pad/truncate and (optionally) running-mean-std normalize.
     """
     if expected <= 0:
         return np.zeros((0,), dtype=np.float32)
 
-    # Keep old behavior for DC (and any 2-var scenario in your codebase)
+    # Keep old behavior for defend_the_center-like 2-var scenarios
     if expected <= 2:
         return preprocess_vars_safe(raw_vars, expected)
 
@@ -198,7 +207,7 @@ def preprocess_vars_safe_general(
             normalizer.update(out)
         return normalizer.normalize(out, clip=clip)
 
-    # Stateless fallback (bounded, robust)
+    # Stateless fallback: signed log scaling
     denom = np.log1p(1000.0).astype(np.float32)
     y = np.sign(out) * (np.log1p(np.abs(out)) / denom)
     return np.clip(y, -1.0, 1.0).astype(np.float32)
@@ -246,6 +255,7 @@ def save_full_checkpoint(
     epoch: int,
     global_step: int,
     best_mean_reward: float,
+    action_spec: dict,
 ):
     ckpt = {
         "meta": {
@@ -261,8 +271,8 @@ def save_full_checkpoint(
             "FRAME_REPEAT": int(FRAME_REPEAT_EFFECTIVE),
             "FRAME_STACK_SIZE": int(FRAME_STACK_SIZE),
             "NUM_VARS": int(NUM_VARS),
-            "action_size": int(agent.action_size),
             "USE_AMP": bool(agent.use_amp),
+            "action_spec": action_spec,
         },
         "agent": agent.state_dict(),
         "rng": _get_rng_state(),
@@ -270,7 +280,7 @@ def save_full_checkpoint(
     torch.save(ckpt, path)
 
 
-def load_full_checkpoint(path: str, agent: "PPOAgent"):
+def load_full_checkpoint(path: str, agent: "PPOAgent", *, expected_action_spec: dict):
     try:
         ckpt = torch.load(path, map_location="cpu", weights_only=False)
     except TypeError:
@@ -286,7 +296,10 @@ def load_full_checkpoint(path: str, agent: "PPOAgent"):
     _assert_eq("FRAME_REPEAT", int(FRAME_REPEAT_EFFECTIVE))
     _assert_eq("FRAME_STACK_SIZE", int(FRAME_STACK_SIZE))
     _assert_eq("NUM_VARS", int(NUM_VARS))
-    _assert_eq("action_size", int(agent.action_size))
+
+    # Action spec mismatch guard (super important when tuning bins/head sizes)
+    if "action_spec" in cfg and cfg["action_spec"] != expected_action_spec:
+        raise ValueError(f"Checkpoint mismatch for action_spec:\nckpt={cfg['action_spec']}\ncur={expected_action_spec}")
 
     agent.load_state_dict(ckpt["agent"])
     _set_rng_state(ckpt.get("rng"))
@@ -314,6 +327,9 @@ def create_simple_game(visible: bool = False, async_player: bool = False):
     for gv in game.get_available_game_variables():
         game.add_available_game_variable(gv)
 
+    game.set_button_max_value(vzd.Button.TURN_LEFT_RIGHT_DELTA, max(abs(x) for x in TURN_LR_DELTAS))
+    game.set_button_max_value(vzd.Button.LOOK_UP_DOWN_DELTA, max(abs(x) for x in LOOK_UD_DELTAS))
+    game.set_button_max_value(vzd.Button.MOVE_LEFT_RIGHT_DELTA, max(abs(x) for x in MOVE_LR_DELTAS))
     game.init()
     print("Doom initialized.")
     return game
@@ -329,8 +345,9 @@ class FrameStack:
 
     def reset(self):
         self.frames.clear()
+        z = np.zeros(self.frame_shape, dtype=np.float32)
         for _ in range(self.stack_size):
-            self.frames.append(np.zeros(self.frame_shape, dtype=np.float32))
+            self.frames.append(z.copy())
 
     def push(self, frame_chw: np.ndarray):
         # frame_chw from utils.preprocess is (1, H, W)
@@ -342,10 +359,172 @@ class FrameStack:
 
 
 # -----------------------------------------------------------------------------
-# FiLM Actor-Critic Network
+# Factorized Action Space (deathmatch-friendly)
+# -----------------------------------------------------------------------------
+# Discretization bins (tune!)
+MOVE_LR_DELTAS = [-10, -5, 0, 5, 10]
+LOOK_UD_DELTAS = [-2, -1, 0, 1, 2]
+TURN_LR_DELTAS = [-6, -3, -2, -1, 0, 1, 2, 3, 6]
+
+# Heads enabled (weapon + speed can be toggled)
+ENABLE_SPEED_HEAD = False  # recommended: set SPEED always on (run)
+ENABLE_WEAPON_HEAD = True
+
+
+@dataclass(frozen=True)
+class ActionSpec:
+    """Defines the factorized action heads and their discrete sizes."""
+    head_names: Tuple[str, ...]
+    head_sizes: Tuple[int, ...]
+
+    def as_dict(self) -> dict:
+        return {"head_names": list(self.head_names), "head_sizes": list(self.head_sizes)}
+
+
+class FactorizedActionMapper:
+    """
+    Maps per-head discrete indices -> ViZDoom action vector (len = n_buttons).
+
+    This mapper assumes the button set from deathmatch.cfg, but it is robust:
+    - If a button isn't present, it will be ignored.
+    - If a delta button isn't present, that head still samples but has no effect (warned once).
+    """
+    def __init__(self, game: vzd.DoomGame):
+        self.buttons = list(game.get_available_buttons())
+        self.n_buttons = len(self.buttons)
+        self.btn_to_idx = {b: i for i, b in enumerate(self.buttons)}
+
+        # Cache indices (or None if absent)
+        def idx(btn):
+            return self.btn_to_idx.get(btn, None)
+
+        self.i_attack = idx(vzd.Button.ATTACK)
+        self.i_speed = idx(vzd.Button.SPEED)
+        self.i_strafe_mod = idx(vzd.Button.STRAFE)
+
+        self.i_move_f = idx(vzd.Button.MOVE_FORWARD)
+        self.i_move_b = idx(vzd.Button.MOVE_BACKWARD)
+        self.i_move_l = idx(vzd.Button.MOVE_LEFT)
+        self.i_move_r = idx(vzd.Button.MOVE_RIGHT)
+        self.i_turn_l = idx(vzd.Button.TURN_LEFT)
+        self.i_turn_r = idx(vzd.Button.TURN_RIGHT)
+
+        self.i_sel_w = {
+            1: idx(vzd.Button.SELECT_WEAPON1),
+            2: idx(vzd.Button.SELECT_WEAPON2),
+            3: idx(vzd.Button.SELECT_WEAPON3),
+            4: idx(vzd.Button.SELECT_WEAPON4),
+            5: idx(vzd.Button.SELECT_WEAPON5),
+            6: idx(vzd.Button.SELECT_WEAPON6),
+        }
+        self.i_next_w = idx(vzd.Button.SELECT_NEXT_WEAPON)
+        self.i_prev_w = idx(vzd.Button.SELECT_PREV_WEAPON)
+
+        self.i_look_ud = idx(vzd.Button.LOOK_UP_DOWN_DELTA)
+        self.i_turn_lr = idx(vzd.Button.TURN_LEFT_RIGHT_DELTA)
+        self.i_move_lr = idx(vzd.Button.MOVE_LEFT_RIGHT_DELTA)
+
+        self._warned_missing_delta = False
+
+    def action_spec(self) -> ActionSpec:
+        names = ["move_fb", "strafe", "turn", "look", "attack"]
+        sizes = [3, len(MOVE_LR_DELTAS), len(TURN_LR_DELTAS), len(LOOK_UD_DELTAS), 2]
+        if ENABLE_SPEED_HEAD:
+            names.append("speed")
+            sizes.append(2)
+        if ENABLE_WEAPON_HEAD:
+            names.append("weapon")
+            sizes.append(1 + 6 + 2)  # none, w1..w6, next, prev  => 9
+        return ActionSpec(tuple(names), tuple(sizes))
+
+    def decode(self, a: np.ndarray) -> List[int]:
+        """
+        a: (H,) indices for each head in the order of action_spec().head_names
+        returns: ViZDoom action list of ints length n_buttons
+        """
+        a = np.asarray(a, dtype=np.int64).reshape(-1)
+        spec = self.action_spec()
+        if a.shape[0] != len(spec.head_names):
+            raise ValueError(f"Expected {len(spec.head_names)} head actions, got {a.shape[0]}")
+
+        out = [0] * self.n_buttons
+
+        # Helper setters (ignore if missing)
+        def set_bin(idx_, val: int):
+            if idx_ is not None:
+                out[idx_] = int(val)
+
+        # Read heads
+        h = dict(zip(spec.head_names, a.tolist()))
+
+        # move_fb: 0=back, 1=none, 2=forward
+        mf = int(h["move_fb"])
+        set_bin(self.i_move_b, 1 if mf == 0 else 0)
+        set_bin(self.i_move_f, 1 if mf == 2 else 0)
+
+        # strafe delta
+        sd = MOVE_LR_DELTAS[int(h["strafe"])]
+        set_bin(self.i_move_lr, sd)
+
+        # turn delta
+        td = TURN_LR_DELTAS[int(h["turn"])]
+        set_bin(self.i_turn_lr, td)
+
+        # look delta
+        ld = LOOK_UD_DELTAS[int(h["look"])]
+        set_bin(self.i_look_ud, ld)
+
+        # attack
+        set_bin(self.i_attack, int(h["attack"]))
+
+        # speed
+        if ENABLE_SPEED_HEAD:
+            set_bin(self.i_speed, int(h["speed"]))
+        else:
+            # Always run, if SPEED is present
+            set_bin(self.i_speed, 1)
+
+        # Optional weapon selection
+        if ENABLE_WEAPON_HEAD:
+            w = int(h["weapon"])  # 0 none, 1..6 weapon, 7 next, 8 prev
+            # clear all weapon selects (already zero)
+            if 1 <= w <= 6:
+                set_bin(self.i_sel_w.get(w, None), 1)
+            elif w == 7:
+                set_bin(self.i_next_w, 1)
+            elif w == 8:
+                set_bin(self.i_prev_w, 1)
+
+        # Prevent contradictory use of legacy buttons:
+        # We rely on DELTA controls; keep TURN_LEFT/RIGHT and MOVE_LEFT/RIGHT off.
+        set_bin(self.i_turn_l, 0)
+        set_bin(self.i_turn_r, 0)
+        set_bin(self.i_move_l, 0)
+        set_bin(self.i_move_r, 0)
+
+        # We also keep STRAFE modifier off (we use dedicated movement controls)
+        set_bin(self.i_strafe_mod, 0)
+
+        # Warn once if delta buttons missing (common if config changes)
+        if not self._warned_missing_delta:
+            missing = []
+            if self.i_move_lr is None:
+                missing.append("MOVE_LEFT_RIGHT_DELTA")
+            if self.i_turn_lr is None:
+                missing.append("TURN_LEFT_RIGHT_DELTA")
+            if self.i_look_ud is None:
+                missing.append("LOOK_UP_DOWN_DELTA")
+            if missing:
+                print("Warning: missing delta buttons in config:", missing)
+            self._warned_missing_delta = True
+
+        return out
+
+
+# -----------------------------------------------------------------------------
+# FiLM Actor-Critic Network (factorized heads)
 # -----------------------------------------------------------------------------
 def norm2d(c: int) -> nn.Module:
-    # BatchNorm2d tends to be unstable for RL with small batch sizes; GroupNorm is safer.
     return nn.GroupNorm(num_groups=min(8, c), num_channels=c)
 
 
@@ -372,10 +551,7 @@ class ResBlock(nn.Module):
 
 
 class FiLM(nn.Module):
-    """
-    Produces (gamma, beta) for a given channel count C from a vars embedding.
-    Initialize to identity (gamma=0, beta=0) so early training matches unconditioned CNN.
-    """
+    """Produces (gamma, beta) for a channel count C from a vars embedding."""
     def __init__(self, embed_dim: int, channels: int):
         super().__init__()
         self.channels = int(channels)
@@ -392,17 +568,15 @@ class FiLM(nn.Module):
 
 
 class FiLMCNN(nn.Module):
-    """
-    CNN backbone with FiLM modulation at multiple feature-map stages.
-    Input is stacked grayscale frames: (B, K, H, W).
-    """
+    """CNN backbone with FiLM modulation at multiple feature-map stages."""
     def __init__(self, in_channels: int, vars_dim: int, embed_dim: int = 128):
         super().__init__()
         self.in_channels = int(in_channels)
         self.vars_dim = int(vars_dim)
         self.embed_dim = int(embed_dim)
 
-        # Vars embed used for all FiLM blocks
+        # Vars embed used for all FiLM blocks.
+        # LayerNorm is OK for >=5 deathmatch vars. If you ever train with 2 vars, consider Identity.
         self.vars_embed = nn.Sequential(
             nn.LayerNorm(self.vars_dim),
             nn.Linear(self.vars_dim, 128),
@@ -411,7 +585,6 @@ class FiLMCNN(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        # Vision trunk (strong-ish but not huge)
         self.stem = nn.Sequential(
             nn.Conv2d(in_channels, 32, kernel_size=3, stride=1, padding=1, bias=False),
             norm2d(32),
@@ -433,7 +606,6 @@ class FiLMCNN(nn.Module):
         )
         self.pool = nn.AdaptiveAvgPool2d((4, 4))
 
-        # FiLM modulations after major stages
         self.film1 = FiLM(self.embed_dim, 32)
         self.film2 = FiLM(self.embed_dim, 64)
         self.film3 = FiLM(self.embed_dim, 96)
@@ -458,18 +630,21 @@ class FiLMCNN(nn.Module):
         return torch.flatten(x, 1)
 
 
-class ActorCriticFiLM(nn.Module):
+class ActorCriticFiLMFactorized(nn.Module):
     """
-    Actor-Critic head on top of FiLM-conditioned CNN.
+    Actor-Critic with factorized categorical heads.
 
-    Inputs:
-      img:  (B, K, H, W) stacked grayscale
-      vars: (B, V) normalized vars vector
+    Returns:
+      actions: (B, H) int64 indices
+      logp:    (B,) summed log-prob
+      entropy: (B,) summed entropy
+      value:   (B,) critic value
     """
-    def __init__(self, action_size: int, num_vars: int, img_hw: Tuple[int, int], in_channels: int):
+    def __init__(self, head_sizes: List[int], num_vars: int, img_hw: Tuple[int, int], in_channels: int):
         super().__init__()
-        self.action_size = int(action_size)
         self.num_vars = int(num_vars)
+        self.head_sizes = [int(x) for x in head_sizes]
+        self.num_heads = len(self.head_sizes)
 
         self.cnn = FiLMCNN(in_channels=in_channels, vars_dim=self.num_vars, embed_dim=128)
 
@@ -483,40 +658,31 @@ class ActorCriticFiLM(nn.Module):
             nn.Linear(cnn_dim, 256),
             nn.ReLU(inplace=True),
         )
-        self.actor = nn.Linear(256, self.action_size)
+
+        # One linear layer per head
+        self.actor_heads = nn.ModuleList([nn.Linear(256, hs) for hs in self.head_sizes])
         self.critic = nn.Linear(256, 1)
 
         self._initialize_weights()
 
     def _initialize_weights(self):
-        # PPO orthogonal init
-        for m in self.modules():
-            if isinstance(m, (nn.Conv2d, nn.Linear)):
-                # FiLM layers already zero-initialized intentionally
-                if isinstance(m, nn.Linear) and m is self.actor:
-                    continue
-                if isinstance(m, nn.Linear) and m is self.critic:
-                    continue
-                if isinstance(m, nn.Linear) and hasattr(m, "weight"):
-                    # Don't override FiLM init (weights are zero)
-                    pass
-
-        # Orthogonal init for non-FiLM convs/linears (best effort)
+        # Orthogonal init for PPO
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.orthogonal_(m.weight, gain=np.sqrt(2))
             elif isinstance(m, nn.Linear):
-                if m in [self.actor, self.critic]:
-                    continue
-                # Skip FiLM internal fc, which should remain zeros
-                if m in [self.cnn.film1.fc, self.cnn.film2.fc, self.cnn.film3.fc, self.cnn.film4.fc]:
+                # Keep FiLM fc weights at zero (identity modulation)
+                # (they're inside FiLM modules; skip them)
+                if hasattr(self, "cnn") and m in [self.cnn.film1.fc, self.cnn.film2.fc, self.cnn.film3.fc, self.cnn.film4.fc]:
                     continue
                 nn.init.orthogonal_(m.weight, gain=np.sqrt(2))
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-        nn.init.orthogonal_(self.actor.weight, gain=0.01)
-        nn.init.zeros_(self.actor.bias)
+        # Smaller init on actor heads, typical PPO
+        for head in self.actor_heads:
+            nn.init.orthogonal_(head.weight, gain=0.01)
+            nn.init.zeros_(head.bias)
 
         nn.init.orthogonal_(self.critic.weight, gain=1.0)
         nn.init.zeros_(self.critic.bias)
@@ -524,18 +690,53 @@ class ActorCriticFiLM(nn.Module):
     def forward_features(self, img: torch.Tensor, vars_: torch.Tensor) -> torch.Tensor:
         return self.fc(self.cnn(img, vars_))
 
-    def get_action_and_value(self, img: torch.Tensor, vars_: torch.Tensor, action: Optional[torch.Tensor] = None):
+    def _dists(self, features: torch.Tensor) -> List[Categorical]:
+        return [Categorical(logits=head(features)) for head in self.actor_heads]
+
+    def get_action_and_value(
+        self,
+        img: torch.Tensor,
+        vars_: torch.Tensor,
+        action: Optional[torch.Tensor] = None,
+    ):
         features = self.forward_features(img, vars_)
-        logits = self.actor(features)
-        dist = Categorical(logits=logits)
+        dists = self._dists(features)
+
         if action is None:
-            action = dist.sample()
+            acts = [d.sample() for d in dists]
+            action = torch.stack(acts, dim=1)  # (B,H)
+        else:
+            # Expect (B,H)
+            if action.ndim == 1:
+                action = action.unsqueeze(0)
+            if action.shape[1] != len(dists):
+                raise ValueError(f"Expected action shape (B,{len(dists)}) got {tuple(action.shape)}")
+
+        logps = []
+        ents = []
+        for i, d in enumerate(dists):
+            ai = action[:, i]
+            logps.append(d.log_prob(ai))
+            ents.append(d.entropy())
+
+        logp = torch.stack(logps, dim=1).sum(dim=1)
+        entropy = torch.stack(ents, dim=1).mean(dim=1)
+
         value = self.critic(features).squeeze(-1)
-        return action, dist.log_prob(action), dist.entropy(), value
+        return action, logp, entropy, value
 
     def get_value(self, img: torch.Tensor, vars_: torch.Tensor):
         features = self.forward_features(img, vars_)
         return self.critic(features).squeeze(-1)
+
+    @torch.no_grad()
+    def get_deterministic_action(self, img: torch.Tensor, vars_: torch.Tensor) -> torch.Tensor:
+        features = self.forward_features(img, vars_)
+        actions = []
+        for head in self.actor_heads:
+            logits = head(features)
+            actions.append(torch.argmax(logits, dim=1))
+        return torch.stack(actions, dim=1)  # (B,H)
 
 
 # -----------------------------------------------------------------------------
@@ -545,11 +746,11 @@ class RolloutBuffer:
     def __init__(self):
         self.img_states = []
         self.var_states = []
-        self.actions = []
-        self.log_probs = []
-        self.rewards = []
-        self.dones = []
-        self.values = []
+        self.actions = []     # (H,)
+        self.log_probs = []   # float
+        self.rewards = []     # float
+        self.dones = []       # float
+        self.values = []      # float
 
     def clear(self):
         self.img_states.clear()
@@ -560,14 +761,14 @@ class RolloutBuffer:
         self.dones.clear()
         self.values.clear()
 
-    def add(self, img_state, var_state, action, log_prob, reward, done, value):
+    def add(self, img_state, var_state, action_heads, log_prob, reward, done, value):
         self.img_states.append(img_state)
         self.var_states.append(var_state)
-        self.actions.append(action)
-        self.log_probs.append(log_prob)
-        self.rewards.append(reward)
-        self.dones.append(done)
-        self.values.append(value)
+        self.actions.append(np.asarray(action_heads, dtype=np.int64))
+        self.log_probs.append(float(log_prob))
+        self.rewards.append(float(reward))
+        self.dones.append(float(done))
+        self.values.append(float(value))
 
     def __len__(self):
         return len(self.actions)
@@ -580,8 +781,8 @@ class RolloutBuffer:
             yield (
                 np.asarray([self.img_states[i] for i in bi], dtype=np.float32),
                 np.asarray([self.var_states[i] for i in bi], dtype=np.float32),
-                np.asarray([self.actions[i] for i in bi], dtype=np.int64),
-                np.asarray([self.log_probs[i] for i in bi], dtype=np.float32),
+                np.asarray([self.actions[i] for i in bi], dtype=np.int64),     # (B,H)
+                np.asarray([self.log_probs[i] for i in bi], dtype=np.float32), # (B,)
                 returns[bi].astype(np.float32),
                 advantages[bi].astype(np.float32),
             )
@@ -593,7 +794,7 @@ class RolloutBuffer:
 class PPOAgent:
     def __init__(
         self,
-        action_size: int,
+        action_mapper: FactorizedActionMapper,
         *,
         lr: float = LEARNING_RATE_PPO,
         gamma: float = GAMMA,
@@ -606,7 +807,9 @@ class PPOAgent:
         mini_batch_size: int = MINI_BATCH_SIZE,
         load_model_path: Optional[str] = None,
     ):
-        self.action_size = int(action_size)
+        self.action_mapper = action_mapper
+        self.spec = action_mapper.action_spec()
+        self.action_spec_dict = self.spec.as_dict()
 
         self.gamma = float(gamma)
         self.gae_lambda = float(gae_lambda)
@@ -614,14 +817,13 @@ class PPOAgent:
         self.entropy_coef = float(entropy_coef)
         self.value_coef = float(value_coef)
         self.max_grad_norm = float(max_grad_norm)
-
         self.ppo_epochs = int(ppo_epochs)
         self.mini_batch_size = int(mini_batch_size)
 
         self.use_amp = USE_AMP
 
-        self.network = ActorCriticFiLM(
-            action_size=self.action_size,
+        self.network = ActorCriticFiLMFactorized(
+            head_sizes=list(self.spec.head_sizes),
             num_vars=NUM_VARS,
             img_hw=RESOLUTION_EFFECTIVE,
             in_channels=FRAME_STACK_SIZE,
@@ -631,7 +833,6 @@ class PPOAgent:
         self.scaler = SCALER
         self.buffer = RolloutBuffer()
 
-        # Running normalization for vars (mainly useful for deathmatch / long var vectors)
         self.vars_rms = RunningMeanStd((NUM_VARS,)) if NUM_VARS > 2 else None
 
         if load_model_path:
@@ -648,19 +849,22 @@ class PPOAgent:
 
     @torch.no_grad()
     def get_action(self, img_state: np.ndarray, var_state: np.ndarray, deterministic: bool = False):
+        """
+        Returns:
+          action_heads: np.ndarray (H,)
+          logp: float
+        """
         img_t = torch.from_numpy(img_state).unsqueeze(0).to(DEVICE)   # (1,K,H,W)
         vars_t = torch.from_numpy(var_state).unsqueeze(0).to(DEVICE)  # (1,V)
 
-        action, logp, _, _ = self.network.get_action_and_value(img_t, vars_t)
         if deterministic:
-            # Greedy action from logits
-            features = self.network.forward_features(img_t, vars_t)
-            logits = self.network.actor(features)
-            action = torch.argmax(logits, dim=1)
-            logp = Categorical(logits=logits).log_prob(action)
-            return action
+            action = self.network.get_deterministic_action(img_t, vars_t)
+            # Compute logp for bookkeeping (optional)
+            _, logp, _, _ = self.network.get_action_and_value(img_t, vars_t, action)
+        else:
+            action, logp, _, _ = self.network.get_action_and_value(img_t, vars_t)
 
-        return int(action.item()), float(logp.item())
+        return action.squeeze(0).detach().cpu().numpy().astype(np.int64), float(logp.item())
 
     def compute_gae(self, next_value: float):
         rewards = np.asarray(self.buffer.rewards, dtype=np.float32)
@@ -671,7 +875,7 @@ class PPOAgent:
         advantages = np.zeros(n, dtype=np.float32)
         last_gae = 0.0
         for t in reversed(range(n)):
-            next_nonterminal = 1.0 - (dones[t])
+            next_nonterminal = 1.0 - dones[t]
             next_values = next_value if t == n - 1 else values[t + 1]
             delta = rewards[t] + self.gamma * next_values * next_nonterminal - values[t]
             last_gae = delta + self.gamma * self.gae_lambda * next_nonterminal * last_gae
@@ -680,14 +884,12 @@ class PPOAgent:
         returns = advantages + values
         return returns.astype(np.float32), advantages.astype(np.float32)
 
-    def update(self, next_value: float):
+    def update(self, next_value: float) -> Dict[str, float]:
         returns, advantages = self.compute_gae(next_value)
-
-        # Advantage normalization is standard for PPO
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-        total_policy = 0.0
-        total_value = 0.0
+        total_policy_loss = 0.0
+        total_value_loss = 0.0
         total_entropy = 0.0
         n_updates = 0
 
@@ -697,8 +899,8 @@ class PPOAgent:
             ):
                 img_t = torch.from_numpy(img_b).to(DEVICE)
                 vars_t = torch.from_numpy(var_b).to(DEVICE)
-                act_t = torch.from_numpy(act_b).to(DEVICE)
-                oldlog_t = torch.from_numpy(oldlog_b).to(DEVICE)
+                act_t = torch.from_numpy(act_b).to(DEVICE)         # (B,H)
+                oldlog_t = torch.from_numpy(oldlog_b).to(DEVICE)   # (B,)
                 ret_t = torch.from_numpy(ret_b).to(DEVICE)
                 adv_t = torch.from_numpy(adv_b).to(DEVICE)
 
@@ -711,9 +913,9 @@ class PPOAgent:
                     policy_loss = -torch.min(surr1, surr2).mean()
 
                     value_loss = F.mse_loss(value, ret_t)
-                    entropy_loss = entropy.mean()
+                    entropy_bonus = entropy.mean()
 
-                    loss = policy_loss + self.value_coef * value_loss - self.entropy_coef * entropy_loss
+                    loss = policy_loss + self.value_coef * value_loss - self.entropy_coef * entropy_bonus
 
                 self.optimizer.zero_grad(set_to_none=True)
                 if self.use_amp:
@@ -727,26 +929,26 @@ class PPOAgent:
                     nn.utils.clip_grad_norm_(self.network.parameters(), self.max_grad_norm)
                     self.optimizer.step()
 
-                total_policy += float(policy_loss.item())
-                total_value += float(value_loss.item())
-                total_entropy += float(entropy_loss.item())
+                total_policy_loss += float(policy_loss.item())
+                total_value_loss += float(value_loss.item())
+                total_entropy += float(entropy_bonus.item())
                 n_updates += 1
 
         self.buffer.clear()
+
         return {
-            "policy_loss": total_policy / max(1, n_updates),
-            "value_loss": total_value / max(1, n_updates),
+            "policy_loss": total_policy_loss / max(1, n_updates),
+            "value_loss": total_value_loss / max(1, n_updates),
             "entropy": total_entropy / max(1, n_updates),
         }
 
     def state_dict(self) -> dict:
-        sd = {
+        return {
             "network": self.network.state_dict(),
             "optimizer": self.optimizer.state_dict(),
             "scaler": (self.scaler.state_dict() if self.use_amp else None),
             "vars_rms": (self.vars_rms.state_dict() if self.vars_rms is not None else None),
         }
-        return sd
 
     def load_state_dict(self, sd: dict):
         self.network.load_state_dict(sd["network"])
@@ -772,11 +974,10 @@ class PPOAgent:
 
 
 # -----------------------------------------------------------------------------
-# -----------------------------------------------------------------------------
-# Evaluation + training loops (progress bars match ppo_late_fusion_gray.py)
+# Evaluation + training loops (same CLI style as ppo_late_fusion_gray.py)
 # -----------------------------------------------------------------------------
 @torch.no_grad()
-def evaluate(game: vzd.DoomGame, agent: PPOAgent, actions, num_episodes: int) -> float:
+def evaluate(game: vzd.DoomGame, agent: PPOAgent, mapper: FactorizedActionMapper, num_episodes: int) -> float:
     agent.set_eval_mode()
     scores = []
     frame_stack = FrameStack(FRAME_STACK_SIZE, RESOLUTION_EFFECTIVE)
@@ -786,13 +987,18 @@ def evaluate(game: vzd.DoomGame, agent: PPOAgent, actions, num_episodes: int) ->
         frame_stack.reset()
 
         while not game.is_episode_finished():
+            if game.is_player_dead():
+                game.respawn_player()
+                frame_stack.reset()
+                continue
+
             gs = game.get_state()
             if gs is None:
-                break
+                continue
 
-            frame = preprocess(gs.screen_buffer, RESOLUTION_EFFECTIVE)  # (1,H,W)
+            frame = preprocess(gs.screen_buffer, RESOLUTION_EFFECTIVE)
             frame_stack.push(frame)
-            state_img = frame_stack.get()  # (K,H,W)
+            state_img = frame_stack.get()
 
             state_vars = preprocess_vars_safe_general(
                 gs.game_variables,
@@ -802,8 +1008,10 @@ def evaluate(game: vzd.DoomGame, agent: PPOAgent, actions, num_episodes: int) ->
                 clip=5.0,
             )
 
-            a_idx = agent.get_action(state_img, state_vars, deterministic=True)
-            game.make_action(actions[a_idx], FRAME_REPEAT_EFFECTIVE)
+            a_heads, _ = agent.get_action(state_img, state_vars, deterministic=True)
+            viz_action = mapper.decode(a_heads)
+
+            game.make_action(viz_action, FRAME_REPEAT_EFFECTIVE)
 
         scores.append(float(game.get_total_reward()))
 
@@ -813,13 +1021,14 @@ def evaluate(game: vzd.DoomGame, agent: PPOAgent, actions, num_episodes: int) ->
             float(scores.mean()), float(scores.std()), float(scores.min()), float(scores.max())
         )
     )
+    agent.set_train_mode()
     return float(scores.mean())
 
 
 def train(
     game: vzd.DoomGame,
     agent: PPOAgent,
-    actions,
+    mapper: FactorizedActionMapper,
     *,
     start_epoch: int = 0,
     start_global_step: int = 0,
@@ -827,7 +1036,6 @@ def train(
 ):
     start_time = time()
     global_step = int(start_global_step)
-
     frame_stack = FrameStack(FRAME_STACK_SIZE, RESOLUTION_EFFECTIVE)
 
     for epoch in range(start_epoch, TRAIN_EPOCHS_PPO):
@@ -835,33 +1043,36 @@ def train(
         print(f"Epoch #{epoch + 1} / {TRAIN_EPOCHS_PPO}")
         print(f"{'=' * 60}")
 
-        # Start a fresh episode for rollout collection
         game.new_episode()
         frame_stack.reset()
 
         train_episode_rewards = []
         ep_reward = 0.0
 
-        # Collect rollout (progress bar shows steps remaining)
+        # Collect rollout
         for _ in trange(STEPS_PER_EPOCH, desc="Collecting rollout", leave=False):
             gs = game.get_state()
             if gs is None:
-                # Treat as terminal and restart
-                train_episode_rewards.append(ep_reward)
-                ep_reward = 0.0
-                game.new_episode()
+                 # If we're dead or in a respawn transition, don't start a brand new episode.
+                if game.is_player_dead():
+                    game.respawn_player()
+                # Otherwise, treat it as a rare glitch / terminal and restart.
+                else:
+                    train_episode_rewards.append(ep_reward)
+                    ep_reward = 0.0
+                    game.new_episode()
                 frame_stack.reset()
                 continue
 
-            frame = preprocess(gs.screen_buffer, RESOLUTION_EFFECTIVE)  # (1,H,W)
+            frame = preprocess(gs.screen_buffer, RESOLUTION_EFFECTIVE)
             frame_stack.push(frame)
-            state_img = frame_stack.get()  # (K,H,W)
+            state_img = frame_stack.get()
 
             state_vars = preprocess_vars_safe_general(
                 gs.game_variables,
                 NUM_VARS,
                 normalizer=agent.vars_rms,
-                update=True,  # update running stats during training
+                update=True,
                 clip=5.0,
             )
 
@@ -869,30 +1080,40 @@ def train(
             vars_t = torch.from_numpy(state_vars).unsqueeze(0).to(DEVICE)
 
             with torch.no_grad():
-                action, logp, _, value = agent.network.get_action_and_value(img_t, vars_t)
+                actions_t, logp_t, _, value_t = agent.network.get_action_and_value(img_t, vars_t)
 
-            a_idx = int(action.item())
-            r = float(game.make_action(actions[a_idx], FRAME_REPEAT_EFFECTIVE))
-            done = bool(game.is_episode_finished())
+            a_heads = actions_t.squeeze(0).detach().cpu().numpy().astype(np.int64)
+            viz_action = mapper.decode(a_heads)
 
+            r = float(game.make_action(viz_action, FRAME_REPEAT_EFFECTIVE))
+            episode_finished = bool(game.is_episode_finished())
+            player_dead = bool(game.is_player_dead())
+            done = episode_finished or player_dead
             ep_reward += r
 
             agent.buffer.add(
                 img_state=state_img,
                 var_state=state_vars,
-                action=a_idx,
-                log_prob=float(logp.item()),
+                action_heads=a_heads,
+                log_prob=float(logp_t.item()),
                 reward=r,
                 done=float(done),
-                value=float(value.item()),
+                value=float(value_t.item()),
             )
             global_step += 1
 
             if done:
                 train_episode_rewards.append(ep_reward)
                 ep_reward = 0.0
-                game.new_episode()
+
+                if episode_finished:
+                    game.new_episode()
+                else:
+                    # died, but match deathmatch semantics: continue the same episode
+                    game.respawn_player()
+
                 frame_stack.reset()
+                continue
 
         # Bootstrap value for last state
         with torch.no_grad():
@@ -906,7 +1127,6 @@ def train(
                     frame = preprocess(gs.screen_buffer, RESOLUTION_EFFECTIVE)
                     frame_stack.push(frame)
                     state_img = frame_stack.get()
-
                     state_vars = preprocess_vars_safe_general(
                         gs.game_variables,
                         NUM_VARS,
@@ -914,14 +1134,12 @@ def train(
                         update=False,
                         clip=5.0,
                     )
-
                     img_t = torch.from_numpy(state_img).unsqueeze(0).to(DEVICE)
                     vars_t = torch.from_numpy(state_vars).unsqueeze(0).to(DEVICE)
                     next_value = float(agent.network.get_value(img_t, vars_t).item())
 
-        # PPO update (prints like late-fusion)
         stats = agent.update(next_value)
-        print(f"\nPPO update stats:")
+        print("\nPPO update stats:")
         print(f"  policy_loss: {stats['policy_loss']:.4f}")
         print(f"  value_loss : {stats['value_loss']:.4f}")
         print(f"  entropy    : {stats['entropy']:.4f}")
@@ -937,7 +1155,7 @@ def train(
             print("Train episodes: none completed during rollout collection.")
 
         print("\nTesting...")
-        mean_test_reward = evaluate(game, agent, actions, num_episodes=TEST_EPISODES)
+        mean_test_reward = evaluate(game, agent, mapper, num_episodes=TEST_EPISODES)
 
         if save_model and mean_test_reward > best_mean_reward:
             best_mean_reward = mean_test_reward
@@ -949,15 +1167,15 @@ def train(
             save_full_checkpoint(
                 checkpoint_savefile,
                 agent,
-                epoch=epoch + 1,  # resume will start at this epoch index
+                epoch=epoch + 1,
                 global_step=global_step,
                 best_mean_reward=best_mean_reward,
+                action_spec=agent.action_spec_dict,
             )
 
         elapsed_min = (time() - start_time) / 60.0
         print(f"Total elapsed time: {elapsed_min:.2f} minutes")
 
-    game.close()
     return best_mean_reward
 
 
@@ -984,13 +1202,14 @@ if __name__ == "__main__":
     print("CHECKPOINT_SAVEFILE:", checkpoint_savefile)
     print("load_checkpoint:", load_checkpoint)
 
-    # Init game and action space
     game = create_simple_game(visible=False, async_player=False)
-    n_buttons = game.get_available_buttons_size()
-    actions = [list(a) for a in it.product([0, 1], repeat=n_buttons)]
-    print("ACTIONS:", len(actions))
 
-    agent = PPOAgent(action_size=len(actions))
+    mapper = FactorizedActionMapper(game)
+    spec = mapper.action_spec()
+    print("FACTOR_HEADS:", spec.head_names)
+    print("HEAD_SIZES   :", spec.head_sizes)
+
+    agent = PPOAgent(action_mapper=mapper)
 
     # Resume training (full) or load weights (inference only)
     start_epoch = 0
@@ -999,26 +1218,28 @@ if __name__ == "__main__":
 
     if load_checkpoint and os.path.exists(checkpoint_savefile):
         print("Loading checkpoint from:", checkpoint_savefile)
-        start_epoch, start_global_step, best_mean_reward = load_full_checkpoint(checkpoint_savefile, agent)
-        print(
-            f"Resuming from epoch={start_epoch}, global_step={start_global_step}, "
-            f"best_mean_reward={best_mean_reward:.2f}"
+        start_epoch, start_global_step, best_mean_reward = load_full_checkpoint(
+            checkpoint_savefile,
+            agent,
+            expected_action_spec=agent.action_spec_dict,
         )
+        print(f"Resuming from epoch={start_epoch}, global_step={start_global_step}, best_mean_reward={best_mean_reward:.2f}")
     elif load_model_weights and os.path.exists(model_savefile):
         print("Loading model weights from:", model_savefile)
         agent.network.load_state_dict(torch.load(model_savefile, map_location=DEVICE))
         agent.set_eval_mode()
 
-    if skip_learning:
-        print("\nTesting...")
-        mean_r = evaluate(game, agent, actions, num_episodes=TEST_EPISODES)
-        print("Mean reward:", mean_r)
-    else:
-        train(
+    if not skip_learning:
+        best_mean_reward = train(
             game,
             agent,
-            actions,
+            mapper,
             start_epoch=start_epoch,
             start_global_step=start_global_step,
             best_mean_reward=best_mean_reward,
         )
+        print("\n" + "=" * 60)
+        print("Training finished.")
+        print("=" * 60)
+
+    game.close()

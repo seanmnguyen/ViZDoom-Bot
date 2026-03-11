@@ -22,11 +22,11 @@ import torch
 import vizdoom as vzd
 
 from utils import *
-# from model_registry import *
 import model_registry as MODELS
 
 import q_rainbow_stacked as rainbow_lazy_mod
 import ppo_late_fusion_rgb_corridor
+import ppo_film_factorized_gray
 from ppo_cnn_gray import FrameStack as PPOFrameStack
 
 # ---------- GLOBALS (same as demo.py; only used to construct agents) ----------
@@ -163,6 +163,8 @@ def evaluate(game: vzd.DoomGame, agent, actions, *, model_type: str, resolution,
                     # TODO: special exception for this model since it uses custom actions
                     if model_type == "ppo_late_fusion_rgb_corridor":
                         state_vars = ppo_late_fusion_rgb_corridor.preprocess_vars_corridor(gs.game_variables)
+                    elif model_type == "ppo_film_factorized_gray":
+                        state_vars = ppo_film_factorized_gray.preprocess_vars_safe_general(gs.game_variables, ppo_film_factorized_gray.NUM_VARS, normalizer=agent.vars_rms, update=False, clip=5.0)
                     else:
                         state_vars = preprocess_vars_safe(gs.game_variables, expected_num_vars)
                     a = agent.get_action(state_img, state_vars, deterministic=True)
@@ -259,7 +261,10 @@ if __name__ == "__main__":
         actions = ppo_late_fusion_rgb_corridor.get_deadly_corridor_actions()
 
     # Build agent
-    if args.model_type in MODELS.PPO_MODELS:
+    if args.model_type == "ppo_film_factorized_gray":
+        mapper = MODELS.FactorizedActionMapper(game)
+        agent = AgentBuilder(action_mapper=mapper)
+    elif args.model_type in MODELS.PPO_MODELS:
         agent = AgentBuilder(action_size=len(actions), load_model_path=model_path)
     elif args.model_type == "q_rainbow_stacked":
         # This agent's constructor does not take load_model/model_weights; load weights manually.
