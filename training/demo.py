@@ -1,37 +1,31 @@
-# Script to load a model and run it against a scenario
+"""demo.py
 
+Run a trained model in ViZDoom with an optional visible window.
+"""
+
+from __future__ import annotations
+
+import argparse
 import itertools as it
 import os
-from time import sleep
-
-import torch
-import argparse
 from pathlib import Path
+from time import sleep
+from typing import Any, Dict
 
+import numpy as np
+import torch
 import vizdoom as vzd
+
 from utils import *
+import model_registry as MODELS
 
-# AGENT IMPORTS
-from q_late_fusion import DQNAgent as DQNAgent_LateFusion
-from q_late_fusion_rgb import DQNAgent as DQNAgent_LateFusionRGB
-from q_cnn import DQNAgent as DQNAgent_CNN
-from q_cnn_rgb import DQNAgent as DQNAgent_CNNRGB
-from q_rainbow_rgb import DQNAgent as DQNAgent_RainbowRGB
-from ppo_cnn import PPOAgent
-from ppo_cnn_gray import PPOAgent as PPOAgent_Gray
-from ppo_cnn_gray import FrameStack, FRAME_STACK_SIZE
-
-# ---------- GLOBALS ----------
-# Just necessary for building the agent, can mostly ignore
-# Q-learning settings
+# -----------------------------------------------------------------------------
+# Globals (only used to construct agents)
+# -----------------------------------------------------------------------------
 learning_rate = 0.00025
 discount_factor = 0.99
 replay_memory_size = 10000
-
-# NN learning settings
 batch_size = 64
-
-# Other parameters
 frame_repeat = 12
 EPISODES_TO_WATCH = 5
 
@@ -42,66 +36,9 @@ if torch.cuda.is_available():
 else:
     DEVICE = torch.device("cpu")
 
-
-# ---------- MODEL MAPPINGS ----------
-# Default scenario for each model type (matches training configs)
-MODEL_DEFAULT_SCENARIO = {
-    "q_cnn": "defend_the_line.cfg",
-    "q_cnn_rgb": "defend_the_line.cfg",
-    "q_late_fusion": "defend_the_center.cfg",
-    "q_late_fusion_rgb": "defend_the_center.cfg",
-    "ppo_cnn": "defend_the_line.cfg",
-    "ppo_cnn_gray": "defend_the_center.cfg",
-    "q_late_fusion_rgb_DC": "deadly_corridor.cfg",
-    "q_rainbow_rgb": "defend_the_center.cfg",
-}
-
-# Map model type -> agent class
-AGENT_BY_MODEL = {
-    "q_cnn": DQNAgent_CNN,
-    "q_cnn_rgb": DQNAgent_CNNRGB,
-    "q_late_fusion": DQNAgent_LateFusion,
-    "q_late_fusion_rgb": DQNAgent_LateFusionRGB,
-    "ppo_cnn": PPOAgent,
-    "ppo_cnn_gray": PPOAgent_Gray,
-    "q_late_fusion_rgb_DC": DQNAgent_LateFusionRGB,
-    "q_rainbow_rgb": DQNAgent_RainbowRGB,
-}
-
-# Map model type -> resolution (for preprocessing)
-RESOLUTION_BY_MODEL = {
-    "q_cnn": (30, 45),
-    "q_cnn_rgb": (96, 128),
-    "q_late_fusion": (96, 128),
-    "q_late_fusion_rgb": (96, 128),
-    "ppo_cnn": (30, 45),
-    "ppo_cnn_gray": (96, 128),
-    "q_late_fusion_rgb_DC": (96, 128),
-    "q_rainbow_rgb": (96, 128),
-}
-
-# Map model type -> RGB or grayscale
-GRAYSCALE = "GRAY8"
-RGB = "RGB24"
-COLOR_BY_MODEL = {
-    "q_cnn": GRAYSCALE,
-    "q_cnn_rgb": RGB,
-    "q_late_fusion": GRAYSCALE,
-    "q_late_fusion_rgb": RGB,
-    "ppo_cnn": GRAYSCALE,
-    "ppo_cnn_gray": GRAYSCALE,
-    "q_late_fusion_rgb_DC": RGB,
-    "q_rainbow_rgb": RGB,
-}
-
-# PPO model interface
-PPO_MODELS = {"ppo_cnn", "ppo_cnn_gray"}
-
-# Models that use frame stacking
-FRAME_STACK_MODELS = {"ppo_cnn_gray"}
-
-
-# ---------- CLI PARSER ----------
+# -----------------------------------------------------------------------------
+# CLI
+# -----------------------------------------------------------------------------
 def str2bool(v):
     """Parse bools from CLI strings."""
     if isinstance(v, bool):
@@ -111,25 +48,20 @@ def str2bool(v):
         return True
     if v in {"false", "f", "0", "no", "n"}:
         return False
-    raise argparse.ArgumentTypeError(
-        f"Invalid boolean value: '{v}'. Use True/False."
-    )
+    raise argparse.ArgumentTypeError(f"Invalid boolean value: '{v}'. Use True/False.")
 
 
 def parse_cli():
-    '''
-    Parse command line arguments.
+    parser = argparse.ArgumentParser(description="Run a trained ViZDoom agent with rendering (optional).")
 
-    Returns: args, agent_builder, model_path
-    '''
-    parser = argparse.ArgumentParser(
-        description="Train/evaluate ViZDoom agents."
-    )
+    available_models = [k for k, v in MODELS.AGENT_BY_MODEL.items() if v is not None]
+    if not available_models:
+        raise RuntimeError("No models available to run (all agent imports failed).")
 
     parser.add_argument(
         "-mt", "--model_type",
-        choices=list(AGENT_BY_MODEL.keys()),
-        default="q_cnn",
+        choices=available_models,
+        default=available_models[0],
         help="Model type."
     )
 
@@ -137,7 +69,7 @@ def parse_cli():
         "-mp", "--model_path",
         type=str,
         default=None,
-        help="Path to model weights for loading. Defaults to ../models/<model_type>.pth"
+        help="Path to model weights for loading. Defaults to ../models/<scenario>/<model_type>.pth (if present)."
     )
 
     parser.add_argument(
@@ -152,33 +84,70 @@ def parse_cli():
         "-sc", "--scenario",
         type=str,
         default=None,
-        help="Scenario config file (e.g., defend_the_line.cfg). Defaults to training scenario for model type."
+        help="Scenario config file (e.g., defend_the_center.cfg). Defaults to training scenario for model type."
     )
 
-    # -h / --help is automatically provided by argparse
     args = parser.parse_args()
 
-    # Resolve model builder
-    agent_builder = AGENT_BY_MODEL[args.model_type]
+    agent_builder = MODELS.AGENT_BY_MODEL[args.model_type]
 
-    # Resolve default paths if not provided
+    # Default path resolution:
+    # 1) prefer ../models/<scenario_stem>/<model_type>.pth (newer layout)
+    # 2) fallback to ../models/<model_type>.pth (older layout)
     default_path = Path("../models") / f"{args.model_type}.pth"
-    model_path = Path(args.model_path) if args.model_path else default_path
+    scenario_default = MODELS.MODEL_DEFAULT_SCENARIO.get(args.model_type)
+    if scenario_default:
+        scen_stem = Path(scenario_default).stem
+        alt = Path("../models") / scen_stem / f"{args.model_type}.pth"
+        if alt.exists():
+            default_path = alt
 
+    model_path = Path(args.model_path) if args.model_path else default_path
     return args, agent_builder, model_path
 
 
-# ---------- DRIVER ----------
+# -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
+
+def _infer_expected_num_vars(agent, game: vzd.DoomGame) -> int:
+    """Prefer the model's declared num_vars if present."""
+    qn = getattr(agent, "q_net", None)
+    if qn is not None and hasattr(qn, "num_vars"):
+        try:
+            return int(qn.num_vars)
+        except Exception:
+            pass
+    return len(game.get_available_game_variables())
+
+
+def _load_weights_state_dict(path: Path, device: torch.device) -> Dict[str, Any]:
+    """Load a pure state_dict saved by torch.save(model.state_dict())."""
+    try:
+        obj = torch.load(path, map_location=device, weights_only=True)
+    except TypeError:
+        obj = torch.load(path, map_location=device)
+
+    if isinstance(obj, dict) and "state_dict" in obj and isinstance(obj["state_dict"], dict):
+        return obj["state_dict"]
+    if isinstance(obj, dict):
+        return obj
+    raise ValueError(f"Unexpected weights file format at {path}")
+
+
+# -----------------------------------------------------------------------------
+# Driver
+# -----------------------------------------------------------------------------
+
 if __name__ == "__main__":
-    # Get Model Type, Agent, and set model path
     args, AgentBuilder, model_path = parse_cli()
 
-    model_loadfile = str(model_path)     # for loading
+    model_loadfile = str(model_path)
     visible_window = args.show
 
-    # Resolve scenario config - use CLI arg or default for model type
-    scenario_file = args.scenario if args.scenario else MODEL_DEFAULT_SCENARIO.get(
-        args.model_type, "defend_the_center.cfg")
+    scenario_file = args.scenario if args.scenario else MODELS.MODEL_DEFAULT_SCENARIO.get(
+        args.model_type, "defend_the_center.cfg"
+    )
     config_file_path = os.path.join(SCENARIO_PATH, scenario_file)
 
     print("model_type:", args.model_type)
@@ -186,7 +155,7 @@ if __name__ == "__main__":
     print("scenario  :", scenario_file)
     print("show      :", visible_window)
 
-    # Initialize game and actions with window visible
+    # Initialize game
     game = vzd.DoomGame()
     game.load_config(config_file_path)
     game.set_window_visible(visible_window)
@@ -194,30 +163,58 @@ if __name__ == "__main__":
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
     game.set_render_hud(True)
 
-    # Specific configs for QLateFusionRGB
-    if COLOR_BY_MODEL[args.model_type] == RGB:
-        game.set_screen_format(vzd.ScreenFormat.RGB24)
-        preprocess = preprocess_rgb
-    elif COLOR_BY_MODEL[args.model_type] == GRAYSCALE:
-        game.set_screen_format(vzd.ScreenFormat.GRAY8)
-        preprocess = preprocess
-    else:
-        raise ValueError(f"Invalid color format for model type {args.model_type}")
+    # Screen format selection
+    color_mode = MODELS.COLOR_BY_MODEL[args.model_type]
+    lazy_mod = MODELS.LAZY_STACK_MODULE_BY_MODEL.get(args.model_type)
+    preprocess_fn = None
 
-    resolution = RESOLUTION_BY_MODEL[args.model_type]
+    # Keep frame_repeat consistent with the model file when available.
+    frame_repeat_effective = int(getattr(lazy_mod, "FRAME_REPEAT", frame_repeat)) if lazy_mod is not None else frame_repeat
+
+    if color_mode == MODELS.RGB:
+        game.set_screen_format(vzd.ScreenFormat.RGB24)
+        preprocess_fn = preprocess_rgb
+    elif color_mode == MODELS.GRAYSCALE:
+        game.set_screen_format(vzd.ScreenFormat.GRAY8)
+        preprocess_fn = preprocess
+    elif color_mode == MODELS.AUTO and lazy_mod is not None:
+        use_gray = bool(getattr(lazy_mod, "USE_GRAYSCALE", False))
+        game.set_screen_format(vzd.ScreenFormat.GRAY8 if use_gray else vzd.ScreenFormat.RGB24)
+        preprocess_fn = None  # lazy models use lazy_mod.preprocess_frame_u8
+    else:
+        raise ValueError(f"Invalid or unsupported color format for model type {args.model_type}")
+
+    resolution = MODELS.RESOLUTION_BY_MODEL[args.model_type]
     game.init()
+
+    # Build action space
     n = game.get_available_buttons_size()
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
 
-    # Initialize our agent with the set parameters
-    if args.model_type in PPO_MODELS:
-        # PPO agents have a different constructor
+    # Build agent
+    if args.model_type in MODELS.PPO_MODELS:
+        agent = AgentBuilder(action_size=len(actions), load_model_path=model_path)
+    elif args.model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL and lazy_mod is not None:
         agent = AgentBuilder(
             action_size=len(actions),
-            load_model_path=model_path,
+            lr=learning_rate,
+            discount_factor=discount_factor,
+            memory_size=replay_memory_size,
+            batch_size=batch_size,
         )
+        sd = _load_weights_state_dict(model_path, DEVICE)
+        agent.q_net.load_state_dict(sd)
+        if hasattr(agent, "target_net"):
+            try:
+                agent.target_net.load_state_dict(sd)
+            except Exception:
+                pass
+        if hasattr(agent, "set_eval_mode"):
+            agent.set_eval_mode()
+        else:
+            agent.q_net.eval()
     else:
-        # DQN-based agents
+        # Legacy DQN-based agents
         agent = AgentBuilder(
             len(actions),
             lr=learning_rate,
@@ -229,43 +226,84 @@ if __name__ == "__main__":
         )
 
     # Set up frame stacking if needed
-    use_frame_stack = args.model_type in FRAME_STACK_MODELS
+    use_frame_stack = args.model_type in MODELS.FRAME_STACK_MODELS
+    frame_stack = None
     if use_frame_stack:
-        frame_stack = FrameStack(FRAME_STACK_SIZE, resolution)
+        if args.model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL and lazy_mod is not None:
+            frame_stack = lazy_mod.FrameStack(lazy_mod.FRAME_STACK_SIZE, lazy_mod.FRAME_C, resolution)
+            frame_stack._inited = False
+        elif color_mode == MODELS.GRAYSCALE:
+            if MODELS.PPOFrameStackGray is None:
+                raise RuntimeError("PPOFrameStackGray import failed, but frame stacking was requested.")
+            frame_stack = MODELS.PPOFrameStackGray(MODELS.PPO_FRAME_STACK_SIZE_GRAY, resolution)
+        elif color_mode == MODELS.RGB:
+            if MODELS.PPOFrameStackRGB is None:
+                raise RuntimeError("PPOFrameStackRGB import failed, but frame stacking was requested.")
+            frame_stack = MODELS.PPOFrameStackRGB(MODELS.PPO_FRAME_STACK_SIZE_RGB, resolution)
+        else:
+            raise ValueError(f"Unsupported color mode {color_mode} for frame stacking.")
 
-    # Play episode with model
-    total_score = 0
+    # Play episodes
+    total_score = 0.0
     for episode_num in range(EPISODES_TO_WATCH):
         game.new_episode()
-        if use_frame_stack:
-            frame_stack.reset()
-        while not game.is_episode_finished():
-            game_state = game.get_state()
-            assert game_state is not None
-            state_img = preprocess(game_state.screen_buffer, resolution)
-            state_vars = preprocess_vars(game_state.game_variables, len(
-                game.get_available_game_variables()))
 
-            # Apply frame stacking if needed
-            if use_frame_stack:
-                frame_stack.push(state_img)
-                state_img = frame_stack.get()
-
-            # PPO agents use deterministic=True for evaluation
-            if args.model_type in PPO_MODELS:
-                best_action_index = agent.get_action(
-                    state_img, deterministic=True)
+        if use_frame_stack and frame_stack is not None:
+            if args.model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL and lazy_mod is not None:
+                frame_stack._inited = False
+                frame_stack.frames.clear()
             else:
-                best_action_index = agent.get_action(state_img, state_vars)
+                frame_stack.reset()
 
-            game.set_action(actions[best_action_index])
-            for _ in range(frame_repeat):
+        while not game.is_episode_finished():
+            gs = game.get_state()
+            if gs is None:
+                break
+
+            expected_num_vars = _infer_expected_num_vars(agent, game)
+            state_vars = preprocess_vars_safe(gs.game_variables, expected_num_vars)
+
+            if args.model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL and lazy_mod is not None:
+                # Lazy-stack Rainbow expects uint8 stacked state images.
+                frame_u8 = lazy_mod.preprocess_frame_u8(gs.screen_buffer)
+                if use_frame_stack and frame_stack is not None:
+                    if not getattr(frame_stack, "_inited", False):
+                        frame_stack.reset(frame_u8)
+                        frame_stack._inited = True
+                    else:
+                        frame_stack.append(frame_u8)
+                    state_img = frame_stack.get()  # uint8 (C*K,H,W)
+                else:
+                    state_img = frame_u8
+            else:
+                assert preprocess_fn is not None
+                state_img = preprocess_fn(gs.screen_buffer, resolution)
+                if use_frame_stack and frame_stack is not None:
+                    frame_stack.push(state_img)
+                    state_img = frame_stack.get()
+
+            # Action selection
+            if args.model_type in MODELS.PPO_MODELS:
+                if args.model_type in MODELS.PPO_STATE_VAR_MODELS:
+                    state_vars = preprocess_vars_safe(gs.game_variables, expected_num_vars)
+                    a = agent.get_action(state_img, state_vars, deterministic=True)
+                else:
+                    a = agent.get_action(state_img, deterministic=True)
+            elif args.model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL and lazy_mod is not None:
+                a = agent.get_action(state_img, state_vars, eval_mode=True)
+            else:
+                a = agent.get_action(state_img, state_vars)
+
+            game.set_action(actions[int(a)])
+            for _ in range(frame_repeat_effective):
                 game.advance_action()
 
-        # Sleep between episodes
         if visible_window:
             sleep(1.0)
-        score = game.get_total_reward()
+
+        score = float(game.get_total_reward())
         total_score += score
         print(f"Episode {episode_num + 1} Total Score: {score}")
-    print(f"-----Average Score: {total_score / EPISODES_TO_WATCH}-----")
+
+    print(f"-----Average Score: {total_score / EPISODES_TO_WATCH:.2f}-----")
+    game.close()
