@@ -34,6 +34,10 @@ from ppo_film_factorized_gray import PPOAgent as PPOAgent_FiLMFactorized
 from ppo_film_factorized_gray import FrameStack as PPOFrameStack_FiLMFactorized
 from ppo_film_factorized_gray import FRAME_STACK_SIZE as PPO_FRAME_STACK_SIZE_FILM_FACTORIZED
 from ppo_film_factorized_gray import FactorizedActionMapper
+from ppo_film_factorized_gray_cig import PPOAgent as PPOAgent_FiLMFactorizedCig
+from ppo_film_factorized_gray_cig import FrameStack as PPOFrameStack_FiLMFactorizedCig
+from ppo_film_factorized_gray_cig import FRAME_STACK_SIZE as PPO_FRAME_STACK_SIZE_FILM_FACTORIZED_CIG
+from ppo_film_factorized_gray_cig import FactorizedActionMapper as FactorizedActionMapperCig
 
 # -----------------------------------------------------------------------------
 # Model registry
@@ -57,6 +61,7 @@ MODEL_DEFAULT_SCENARIO = {
     "ppo_late_fusion_gray": "defend_the_center.cfg",
     "ppo_film_gray": "defend_the_center.cfg",
     "ppo_film_factorized_gray": "deathmatch.cfg",
+    "ppo_film_factorized_gray_cig": "cig_learning.cfg",
 }
 
 AGENT_BY_MODEL = {
@@ -77,6 +82,7 @@ AGENT_BY_MODEL = {
     "ppo_late_fusion_gray": PPOAgent_LateFusionGray,
     "ppo_film_gray": PPOAgent_FiLMGray,
     "ppo_film_factorized_gray": PPOAgent_FiLMFactorized,
+    "ppo_film_factorized_gray_cig": PPOAgent_FiLMFactorizedCig,
 }
 
 RESOLUTION_BY_MODEL = {
@@ -97,6 +103,7 @@ RESOLUTION_BY_MODEL = {
     "ppo_late_fusion_gray": (96, 128),
     "ppo_film_gray": (96, 128),
     "ppo_film_factorized_gray": (96, 128),
+    "ppo_film_factorized_gray_cig": (96, 128),
 }
 
 GRAYSCALE = "GRAY8"
@@ -120,6 +127,7 @@ COLOR_BY_MODEL = {
     "ppo_late_fusion_gray": GRAYSCALE,
     "ppo_film_gray": GRAYSCALE,
     "ppo_film_factorized_gray": GRAYSCALE,
+    "ppo_film_factorized_gray_cig": GRAYSCALE,
 }
 
 PPO_MODELS = {
@@ -133,6 +141,7 @@ PPO_MODELS = {
     "ppo_late_fusion_gray",
     "ppo_film_gray",
     "ppo_film_factorized_gray",
+    "ppo_film_factorized_gray_cig",
 }
 
 # Maps models to FrameStack class
@@ -143,7 +152,8 @@ FRAME_STACK_MODELS = {
     "ppo_late_fusion_rgb_corridor": PPOFrameStackRGBCorridor,
     "ppo_late_fusion_gray": PPOFrameStack_LateFusionGray,
     "ppo_film_gray": PPOFrameStack_FiLMGray,
-    "ppo_film_gray": PPOFrameStack_FiLMFactorized,
+    "ppo_film_factorized_gray": PPOFrameStack_FiLMFactorized,
+    "ppo_film_factorized_gray_cig": PPOFrameStack_FiLMFactorizedCig,
 }
 
 # Maps model to FRAME_STACK_SIZE
@@ -154,7 +164,8 @@ FRAME_STACK_SIZE = {
     "ppo_late_fusion_rgb_corridor": PPO_FRAME_STACK_SIZE_LATE_FUSION_RGB_CORRIDOR,
     "ppo_late_fusion_gray": PPO_FRAME_STACK_SIZE_LATE_FUSION_GRAY,
     "ppo_film_gray": PPO_FRAME_STACK_SIZE_FILM_GRAY,
-    "ppo_film_gray": PPO_FRAME_STACK_SIZE_FILM_FACTORIZED,
+    "ppo_film_factorized_gray": PPO_FRAME_STACK_SIZE_FILM_FACTORIZED,
+    "ppo_film_factorized_gray_cig": PPO_FRAME_STACK_SIZE_FILM_FACTORIZED_CIG,
 }
 
 # Late-fusion PPO models (need state_vars in get_action)
@@ -165,9 +176,16 @@ PPO_STATE_VAR_MODELS = {
     "ppo_late_fusion_gray",
     "ppo_film_gray",
     "ppo_film_factorized_gray",
+    "ppo_film_factorized_gray_cig",
 }
 
 # Lazy-stacked Rainbow models need special preprocessing
 LAZY_STACK_MODULE_BY_MODEL = {
     "q_rainbow_stacked": rainbow_lazy_mod,
+}
+
+# Factorized Mapper
+FACTORIZED_ACTION_MAPPER = {
+    "ppo_film_factorized_gray": FactorizedActionMapper,
+    "ppo_film_factorized_gray_cig": FactorizedActionMapperCig,
 }

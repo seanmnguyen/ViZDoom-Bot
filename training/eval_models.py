@@ -14,8 +14,10 @@ Example:
 import argparse
 import itertools as it
 import os
+import sys
 from pathlib import Path
 from time import sleep
+from random import choice
 
 import numpy as np
 import torch
@@ -54,7 +56,7 @@ def parse_cli():
 
     parser.add_argument(
         "-mt", "--model_type",
-        choices=list(MODELS.AGENT_BY_MODEL.keys()),
+        choices=list(MODELS.AGENT_BY_MODEL.keys()) + ["random"],
         default="q_cnn",
         help="Model type."
     )
@@ -89,6 +91,10 @@ def parse_cli():
     )
 
     args = parser.parse_args()
+
+    # Ignore remaining arguments for random model
+    if args.model_type == "random":
+        return args, None, None
 
     agent_builder = MODELS.AGENT_BY_MODEL[args.model_type]
 
@@ -196,6 +202,54 @@ def evaluate(game: vzd.DoomGame, agent, actions, *, model_type: str, resolution,
 
     return np.asarray(scores, dtype=np.float32)
 
+def run_random_agent(game, episodes, scenario):
+    # Special button handling
+    if scenario == "defend_the_line":
+        game.add_available_button(vzd.Button.MOVE_LEFT)
+        game.add_available_button(vzd.Button.MOVE_RIGHT)
+
+    # Build action space
+    n = game.get_available_buttons_size()
+    actions = [list(a) for a in it.product([0, 1], repeat=n)]
+    print("Number of Buttons available:", game.get_available_buttons_size())
+    print("Number of Actions available:", len(actions))
+
+    # Initialize game
+    game.init()
+
+    # Evaluate
+    scores = []
+    for ep in range(episodes):
+        game.new_episode()
+
+        while not game.is_episode_finished():
+            gs = game.get_state()
+            if gs is None:
+                break
+            
+            random_action = choice(actions)
+            if visible_window:
+                game.set_action(random_action)
+                for _ in range(frame_repeat):
+                    game.advance_action()
+            else:
+                game.make_action(random_action, frame_repeat)
+
+        score = game.get_total_reward()
+        scores.append(score)
+
+        if visible_window:
+            print(f"Episode {ep + 1} Total Score: {score}")
+            sleep(0.2)
+        elif ep % 10 == 0:
+            print(f"Episode {ep + 1} Total Score: {score}")
+
+    scores = np.asarray(scores, dtype=np.float32)
+
+    print("======================================")
+    print("Score: mean {:.2f} +/- {:.2f}, min {:.2f}, max {:.2f}".format(
+        float(scores.mean()), float(scores.std()), float(scores.min()), float(scores.max())
+    ))
 
 if __name__ == "__main__":
     # Uses GPU if available (same as demo.py)
@@ -218,6 +272,7 @@ if __name__ == "__main__":
     print("model_type:", args.model_type)
     print("load path :", model_loadfile)
     print("scenario  :", scenario_file)
+    print("config    :", config_file_path)
     print("show      :", visible_window)
     print("episodes  :", args.episodes)
 
@@ -227,6 +282,12 @@ if __name__ == "__main__":
     game.set_window_visible(visible_window)
     game.set_mode(vzd.Mode.ASYNC_PLAYER if visible_window else vzd.Mode.PLAYER)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
+
+    # If running dummy (just random actions), skip everything
+    if args.model_type == "random":
+        run_random_agent(game, args.episodes, args.scenario)
+        game.close()
+        sys.exit(0)
 
     # Match demo.py's screen format selection, but allow AUTO for modules that self-toggle RGB/Gray
     color_mode = MODELS.COLOR_BY_MODEL[args.model_type]
