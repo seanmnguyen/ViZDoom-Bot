@@ -52,12 +52,10 @@ load_model     = True
 skip_learning  = True
 
 config_file_path = os.path.join(SCENARIO_PATH, "deadly_corridor.cfg")
-print(config_file_path)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if torch.cuda.is_available():
     torch.backends.cudnn.benchmark = True
-print(f"Using device: {DEVICE}")
 
 
 # ── Actions ───────────────────────────────────────────────────────────────────
@@ -417,6 +415,9 @@ def run(game, agent, num_epochs, steps_per_epoch, frame_repeat):
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    print(config_file_path)
+    print(f"Using device: {DEVICE}")
+
     game = create_simple_game()
     print(f"Action space size: {len(actions)}")
 

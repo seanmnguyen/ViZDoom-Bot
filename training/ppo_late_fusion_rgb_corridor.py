@@ -101,11 +101,6 @@ else:
 
 NUM_VARS = get_num_game_variables(config_file_path)
 
-print(config_file_path)
-print(f"Using device: {DEVICE}")
-print(f"Number of game variables (cfg): {NUM_VARS}")
-print(f"Number of network input vars: {NET_NUM_VARS}")
-
 # total enemies in deadly_corridor
 TOTAL_ENEMIES = 6
 
@@ -749,6 +744,11 @@ def run(game, agent, actions, num_epochs, steps_per_epoch, frame_repeat):
 
 
 if __name__ == "__main__":
+    print(config_file_path)
+    print(f"Using device: {DEVICE}")
+    print(f"Number of game variables (cfg): {NUM_VARS}")
+    print(f"Number of network input vars: {NET_NUM_VARS}")
+
     # Initialize game and actions
     game = create_simple_game()
 

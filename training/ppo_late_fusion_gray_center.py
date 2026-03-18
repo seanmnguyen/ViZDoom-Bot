@@ -49,12 +49,10 @@ load_model     = True
 skip_learning  = True
 
 config_file_path = os.path.join(SCENARIO_PATH, "defend_the_line.cfg")
-print(config_file_path)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if torch.cuda.is_available():
     torch.backends.cudnn.benchmark = True
-print(f"Using device: {DEVICE}")
 
 
 # ── Game setup ────────────────────────────────────────────────────────────────
@@ -434,6 +432,9 @@ def run(game, agent, actions, num_epochs, steps_per_epoch, frame_repeat):
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    print(config_file_path)
+    print(f"Using device: {DEVICE}")
+
     game    = create_simple_game()
     n       = game.get_available_buttons_size()
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
