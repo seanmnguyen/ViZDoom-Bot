@@ -44,7 +44,9 @@ def main():
     color_mode = MODELS.COLOR_BY_MODEL[args.model_type]
 
     game = vzd.DoomGame()
-    game.load_config(os.path.join(vzd.scenarios_path, "deathmatch.cfg"))
+    SCENARIO_NAME = "cig_learning"
+    config_file_path = os.path.join(SCENARIO_PATH, f"{SCENARIO_NAME}.cfg")
+    game.load_config(config_file_path)
     # game.set_doom_map("map01")
 
     # Join host
@@ -59,7 +61,27 @@ def main():
     for gv in game.get_available_game_variables():
         game.add_available_game_variable(gv)
 
+    color_mode = MODELS.COLOR_BY_MODEL[args.model_type]
+    if color_mode == MODELS.RGB:
+        game.set_screen_format(vzd.ScreenFormat.RGB24)
+        preprocess_fn = preprocess_rgb
+    elif color_mode == MODELS.GRAYSCALE:
+        game.set_screen_format(vzd.ScreenFormat.GRAY8)
+        preprocess_fn = preprocess
+    elif color_mode == MODELS.AUTO and args.model_type == "q_rainbow_stacked":
+        # Use the module's single switch (USE_GRAYSCALE) to decide.
+        if rainbow_lazy_mod.USE_GRAYSCALE:
+            game.set_screen_format(vzd.ScreenFormat.GRAY8)
+        else:
+            game.set_screen_format(vzd.ScreenFormat.RGB24)
+        # We will use rainbow_lazy_mod.preprocess_frame_u8 inside evaluate() for this model.
+        preprocess_fn = None
+    else:
+        raise ValueError(f"Invalid color format for model type {args.model_type}")
+
     resolution = MODELS.RESOLUTION_BY_MODEL[model_type]
+
+    game.set_window_visible(True)
 
     game.init()
 
@@ -76,8 +98,9 @@ def main():
     batch_size = 128
 
     # Build agent
-    if args.model_type == "ppo_film_factorized_gray":
-        mapper = MODELS.FactorizedActionMapper(game)
+    mapper = None
+    if args.model_type in {"ppo_film_factorized_gray", "ppo_film_factorized_gray_cig"}:
+        mapper = MODELS.FACTORIZED_ACTION_MAPPER[model_type](game)
         agent = AgentBuilder(action_mapper=mapper)
     elif args.model_type in MODELS.PPO_MODELS:
         agent = AgentBuilder(action_size=len(actions), load_model_path=model_path)
@@ -163,8 +186,16 @@ def main():
                     state_vars = ppo_late_fusion_rgb_corridor.preprocess_vars_corridor(gs.game_variables)
                 elif model_type == "ppo_film_factorized_gray":
                     state_vars = ppo_film_factorized_gray.preprocess_vars_safe_general(gs.game_variables, ppo_film_factorized_gray.NUM_VARS, normalizer=agent.vars_rms, update=False, clip=5.0)
+                elif model_type == "ppo_film_factorized_gray_cig":
+                    import ppo_film_factorized_gray_cig
+                    state_vars = ppo_film_factorized_gray_cig.preprocess_vars_safe_general(gs.game_variables, ppo_film_factorized_gray_cig.NUM_VARS, normalizer=agent.vars_rms, update=False, clip=5.0)
+                elif model_type == "ppo_film_gray":
+                    import ppo_film_gray
+                    state_vars = ppo_film_gray.preprocess_vars_safe_general(gs.game_variables, ppo_film_factorized_gray.NUM_VARS, normalizer=agent.vars_rms, update=False, clip=5.0)
                 else:
                     state_vars = preprocess_vars_safe(gs.game_variables, expected_num_vars)
+
+                # TODO: add special case for factorized heads --> get action, run through mapper first
                 a = agent.get_action(state_img, state_vars, deterministic=True)
             else:
                 a = agent.get_action(state_img, deterministic=True)
@@ -177,7 +208,19 @@ def main():
                 a = agent.get_action(state_img, state_vars)
 
         # Act
-        game.make_action(actions[a], args.frame_repeat)
+        if mapper is not None:
+            act = mapper.decode(a)
+        else:
+            act = actions[a]
+
+        if args.show:
+            game.set_action(act)
+            for _ in range(args.frame_repeat):
+                game.advance_action()
+                if game.is_episode_finished() or game.is_player_dead():
+                    break
+        else:
+            game.make_action(act, args.frame_repeat)
 
         # Optional: print frag updates
         frags = int(game.get_game_variable(vzd.GameVariable.FRAGCOUNT))

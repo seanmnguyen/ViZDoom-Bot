@@ -9,19 +9,21 @@ import itertools as it
 from random import choice
 
 import vizdoom as vzd
-
+from utils import SCENARIO_PATH
 
 game = vzd.DoomGame()
 
 # Use CIG example config or your own.
-game.load_config(os.path.join(vzd.scenarios_path, "cig.cfg"))
+SCENARIO_NAME = "cig_learning"
+config_file_path = os.path.join(SCENARIO_PATH, f"{SCENARIO_NAME}.cfg")
+game.load_config(config_file_path)
 
-game.set_doom_map("map01")  # Limited deathmatch.
+# game.set_doom_map("map01")  # Limited deathmatch.
 # game.set_doom_map("map02")  # Full deathmatch.
 
 # Host game with options that will be used in the competition.
 game.add_game_args(
-    "-host 2 "
+    "-host 3 "
     # This machine will function as a host for a multiplayer game with this many players (including this machine).
     # It will wait for other machines to connect using the -join parameter and then start the game when everyone is connected.
     "-port 5029 "  # Specifies the port (default is 5029).
@@ -49,13 +51,14 @@ game.add_game_args("+name Host +colorset 0")
 # game.set_mode(vzd.Mode.PLAYER)
 game.set_mode(vzd.Mode.ASYNC_PLAYER)
 
-# game.set_window_visible(False)
+game.set_window_visible(False)
 
 game.init()
 
 # Three example sample actions
 n_buttons = game.get_available_buttons_size()
-actions = [list(a) for a in it.product([0, 1], repeat=n_buttons)]
+noop = [0] * n_buttons
+# actions = [list(a) for a in it.product([0, 1], repeat=n_buttons)]
 
 # Play until the game (episode) is over.
 while not game.is_episode_finished():
@@ -66,7 +69,7 @@ while not game.is_episode_finished():
     # Analyze the state.
 
     # Make your action.
-    game.make_action(choice(actions))
+    game.make_action(noop)
 
     # Check if player is dead
     if game.is_player_dead():
