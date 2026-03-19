@@ -79,7 +79,6 @@ import vizdoom as vzd
 from utils import *
 import model_registry as MODELS
 
-import q_rainbow_stacked as rainbow_lazy_mod
 import ppo_late_fusion_rgb_corridor
 import ppo_film_factorized_gray
 
@@ -425,7 +424,7 @@ def build_agent(model_type: str, agent_builder, model_path: Path, game: vzd.Doom
         _set_eval_mode(agent)
         return agent
 
-    if model_type == "q_rainbow_stacked":
+    if model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL:
         agent = agent_builder(
             action_size=len(actions),
             lr=learning_rate,
@@ -478,6 +477,10 @@ def build_eval_context(entry: ManifestEntry, visible_window: bool) -> EvalContex
     game.set_mode(vzd.Mode.ASYNC_PLAYER if visible_window else vzd.Mode.PLAYER)
     game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
 
+    # Import lazy module
+    if model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL:
+        rainbow_lazy_mod = MODELS.LAZY_STACK_MODULE_BY_MODEL[model_type]
+
     color_mode = MODELS.COLOR_BY_MODEL[model_type]
     if color_mode == MODELS.RGB:
         game.set_screen_format(vzd.ScreenFormat.RGB24)
@@ -513,6 +516,7 @@ def build_eval_context(entry: ManifestEntry, visible_window: bool) -> EvalContex
     use_frame_stack = model_type in MODELS.FRAME_STACK_MODELS
     if use_frame_stack:
         if model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL:
+            rainbow_lazy_mod = MODELS.LAZY_STACK_MODULE_BY_MODEL[model_type]
             frame_stack = rainbow_lazy_mod.FrameStack(
                 rainbow_lazy_mod.FRAME_STACK_SIZE,
                 rainbow_lazy_mod.FRAME_C,
@@ -594,7 +598,8 @@ def evaluate_model(entry: ManifestEntry, ctx: EvalContext, episodes: int, visibl
             if gs is None:
                 break
 
-            if model_type == "q_rainbow_stacked":
+            if model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL:
+                rainbow_lazy_mod = MODELS.LAZY_STACK_MODULE_BY_MODEL[model_type]
                 frame_u8 = rainbow_lazy_mod.preprocess_frame_u8(gs.screen_buffer)
                 if use_frame_stack:
                     if not getattr(frame_stack, "_inited", False):

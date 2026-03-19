@@ -32,7 +32,7 @@ from utils import *  # use shared constants + preprocess functions
 # -----------------------------------------------------------------------------
 # Scenario / save naming (README convention)
 # -----------------------------------------------------------------------------
-SCENARIO_NAME = "deadly_corridor"
+SCENARIO_NAME = "defend_the_center"
 preprocess_vars = preprocess_vars_health # ONLY USE FOR DEADLY_CORRIDOR
 config_file_path = os.path.join(SCENARIO_PATH, f"{SCENARIO_NAME}.cfg")
 

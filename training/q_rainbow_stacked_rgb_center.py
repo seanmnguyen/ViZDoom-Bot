@@ -46,11 +46,9 @@ from utils import *  # shared constants + preprocess functions
 # Scenario / save naming
 # -----------------------------------------------------------------------------
 SCENARIO_NAME = "defend_the_center"
-# SCENARIO_NAME = "deadly_corridor"
 config_file_path = os.path.join(SCENARIO_PATH, f"{SCENARIO_NAME}.cfg")
 
-MODEL_TYPE = os.path.splitext(os.path.basename(__file__))[0] + "_nostack"
-# MODEL_TYPE = os.path.splitext(os.path.basename(__file__))[0]
+MODEL_TYPE = os.path.splitext(os.path.basename(__file__))[0]
 model_savefile = f"../models/{SCENARIO_NAME}/{MODEL_TYPE}.pth"
 os.makedirs(os.path.dirname(model_savefile), exist_ok=True)
 
@@ -157,7 +155,7 @@ def load_full_checkpoint(path: str, agent: "DQNAgent"):
 # -----------------------------------------------------------------------------
 # 🔁 ONE SWITCH: RGB <-> Grayscale
 # -----------------------------------------------------------------------------
-USE_GRAYSCALE = True
+USE_GRAYSCALE = False
 
 # -----------------------------------------------------------------------------
 # Device
