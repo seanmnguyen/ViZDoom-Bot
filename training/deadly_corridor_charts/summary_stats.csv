@@ -1,0 +1,8 @@
+model,n,mean,std,ci_low,ci_high,display_name,algorithm,visual_input,architecture,frame_stacked,is_baseline,is_best
+../models/deadly_corridor/ppo_film_gray.pth,3004,375.4319938984755,120.71010908725239,370.9392865641933,379.6027411895173,ppo_film_gray,PPO,Grayscale,FiLM,False,False,True
+../models/deadly_corridor/ppo_late_fusion_gray.pth,3004,245.42619450717729,154.02085546134956,239.78078152647666,251.04626505974923,ppo_late_fusion_gray,PPO,Grayscale,LateFusion,False,False,False
+../models/deadly_corridor/ppo_cnn_gray_stacked.pth,3004,229.80198548541722,182.75821717359224,223.30028875810646,236.3465113228393,ppo_cnn_gray_stacked,PPO,Grayscale,CNN,True,False,False
+../models/deadly_corridor/ppo_late_fusion_rgb.pth,3004,180.54347424564284,156.8253894272749,174.94498170619005,186.11658245993357,ppo_late_fusion_rgb,PPO,RGB,LateFusion,False,False,False
+../models/deadly_corridor/ppo_cnn_gray.pth,3004,149.81079072609404,139.19913151227234,144.9106009207775,154.883945683633,ppo_cnn_gray,PPO,Grayscale,CNN,False,False,False
+../models/deadly_corridor/q_rainbow_stacked_gray.pth,3004,107.32469537635936,173.22515721448553,101.10970962050752,113.38662198215286,q_rainbow_stacked_gray,Q-Learning,Grayscale,Rainbow,True,False,False
+random,3004,-15.110943375058191,119.04960024737461,-19.34391130887427,-10.846389837161782,random,Random,,Random,False,True,False
