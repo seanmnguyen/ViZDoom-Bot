@@ -152,18 +152,17 @@
       "model_filename": "q_rainbow_stacked_gray.pth",
       "skip": "False"
     },
-    {
-      "model_type": "ppo_film_gray_deathmatch",
-      "scenario": "deathmatch",
-      "model_filename": "ppo_film_gray.pth",
-      "skip": "False"
-    },
-
 
     {
-      "model_type": "ppo_film_gray_deathmatch",
+      "model_type": "ppo_cnn_stacked_gray_deathmatch",
       "scenario": "deathmatch",
-      "model_filename": "ppo_film_gray.pth",
+      "model_filename": "ppo_cnn_gray_stacked.pth",
+      "skip": "True"
+    },
+    {
+      "model_type": "ppo_late_fusion_gray_deathmatch",
+      "scenario": "deathmatch",
+      "model_filename": "ppo_late_fusion_gray.pth",
       "skip": "False"
     },
     {
@@ -173,9 +172,9 @@
       "skip": "False"
     },
     {
-      "model_type": "ppo_film_gray_deathmatch",
+      "model_type": "ppo_film_factorized_gray",
       "scenario": "deathmatch",
-      "model_filename": "ppo_film_gray.pth",
+      "model_filename": "ppo_film_factorized_gray2.pth",
       "skip": "False"
     }
   ]

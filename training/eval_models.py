@@ -26,7 +26,6 @@ import vizdoom as vzd
 from utils import *
 import model_registry as MODELS
 
-import q_rainbow_stacked as rainbow_lazy_mod
 import ppo_late_fusion_rgb_corridor
 import ppo_film_factorized_gray
 from ppo_cnn_gray import FrameStack as PPOFrameStack
@@ -143,8 +142,9 @@ def evaluate(game: vzd.DoomGame, agent, actions, *, model_type: str, resolution,
                 break
 
             # Preprocess
-            if model_type == "q_rainbow_stacked":
+            if model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL:
                 # This model expects uint8 CHW frames and does its own lazy stacking convention.
+                rainbow_lazy_mod = MODELS.LAZY_STACK_MODULE_BY_MODEL[model_type]
                 frame_u8 = rainbow_lazy_mod.preprocess_frame_u8(gs.screen_buffer)
                 if use_frame_stack:
                     # Fill the stack with the first frame for a clean start (matches training).
@@ -251,6 +251,8 @@ def run_random_agent(game, episodes, scenario):
 
     scores = np.asarray(scores, dtype=np.float32)
 
+    np.savetxt(f"random_{scenario}_data.csv", scores, delimiter=", ", fmt="%f")
+
     print("======================================")
     print("Score: mean {:.2f} +/- {:.2f}, min {:.2f}, max {:.2f}".format(
         float(scores.mean()), float(scores.std()), float(scores.min()), float(scores.max())
@@ -293,6 +295,10 @@ if __name__ == "__main__":
         run_random_agent(game, args.episodes, args.scenario)
         game.close()
         sys.exit(0)
+
+    # Import lazy module
+    if model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL:
+        rainbow_lazy_mod = MODELS.LAZY_STACK_MODULE_BY_MODEL[model_type]
 
     # Match demo.py's screen format selection, but allow AUTO for modules that self-toggle RGB/Gray
     color_mode = MODELS.COLOR_BY_MODEL[args.model_type]
@@ -365,7 +371,12 @@ if __name__ == "__main__":
     if use_frame_stack:
         if args.model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL:
             # Uses its own stacker: stores uint8 frames (C,H,W) and concatenates to (C*K,H,W).
-            frame_stack = rainbow_lazy_mod.FrameStack(rainbow_lazy_mod.FRAME_STACK_SIZE, rainbow_lazy_mod.FRAME_C, resolution)
+            rainbow_lazy_mod = MODELS.LAZY_STACK_MODULE_BY_MODEL[model_type]
+            frame_stack = rainbow_lazy_mod.FrameStack(
+                rainbow_lazy_mod.FRAME_STACK_SIZE,
+                rainbow_lazy_mod.FRAME_C,
+                resolution,
+            )
         else:
             FrameStack = MODELS.FRAME_STACK_MODELS[args.model_type]
             frame_stack = FrameStack(MODELS.FRAME_STACK_SIZE[args.model_type], resolution)

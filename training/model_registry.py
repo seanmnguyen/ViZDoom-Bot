@@ -25,6 +25,9 @@ from ppo_cnn_gray import PPOAgent as PPOAgent_Gray
 from ppo_cnn_gray import FrameStack as PPOFrameStackGray
 from ppo_cnn_gray import FRAME_STACK_SIZE as PPO_FRAME_STACK_SIZE_CNN_GRAY
 from ppo_cnn_gray_corridor import PPOAgent as PPOAgent_CNNGrayCorridor
+from ppo_cnn_gray_deathmatch import PPOAgent as PPOAgent_CNNGrayDeathmatch
+from ppo_cnn_gray_deathmatch import FrameStack as PPOFrameStack_CNNGrayDeathmatch
+from ppo_cnn_gray_deathmatch import FRAME_STACK_SIZE as PPO_FRAME_STACK_SIZE_CNN_GRAY_DEATHMATCH
 from ppo_cnn_stacked_gray_corridor import PPOAgent as PPOAgent_CNNStackedGrayCorridor
 from ppo_cnn_stacked_gray_corridor import FrameStack as PPOFrameStack_CNNGrayCorridor
 from ppo_cnn_stacked_gray_corridor import FRAME_STACK_SIZE as PPO_FRAME_STACK_SIZE_CNN_GRAY_CORRIDOR
@@ -80,6 +83,7 @@ MODEL_DEFAULT_SCENARIO = {
     "ppo_cnn_rgb_center": "defend_the_center.cfg",
     "ppo_cnn_gray_corridor": "deadly_corridor.cfg",
     "ppo_cnn_stacked_gray_corridor": "deadly_corridor.cfg",
+    "ppo_cnn_stacked_gray_deathmatch": "deathmatch.cfg",
     "ppo_late_fusion_gray_line": "defend_the_line.cfg",
     "ppo_late_fusion_rgb_line": "defend_the_line.cfg",
     "ppo_late_fusion_rgb_center": "defend_the_center.cfg",
@@ -111,6 +115,7 @@ AGENT_BY_MODEL = {
     "ppo_cnn_rgb_center": PPOAgent_CNNRGBCenter,
     "ppo_cnn_gray_corridor": PPOAgent_CNNGrayCorridor,
     "ppo_cnn_stacked_gray_corridor": PPOAgent_CNNStackedGrayCorridor,
+    "ppo_cnn_stacked_gray_deathmatch": PPOAgent_CNNGrayDeathmatch,
     "ppo_late_fusion_gray_line": PPOAgent_LateFusionGrayLine,
     "ppo_late_fusion_rgb_line": PPOAgent_LateFusionRGBLine,
     "ppo_late_fusion_rgb_center": PPOAgent_LateFusionRGBCenter,
@@ -142,6 +147,7 @@ RESOLUTION_BY_MODEL = {
     "ppo_cnn_rgb_center": (30, 45),
     "ppo_cnn_gray_corridor": (30, 45),
     "ppo_cnn_stacked_gray_corridor": (96, 128),
+    "ppo_cnn_stacked_gray_deathmatch": (96, 128),
     "ppo_late_fusion_gray_line": (30, 45),
     "ppo_late_fusion_rgb_line": (30, 45),
     "ppo_late_fusion_rgb_center": (30, 45),
@@ -177,6 +183,7 @@ COLOR_BY_MODEL = {
     "ppo_cnn_rgb_center": RGB,
     "ppo_cnn_gray_corridor": GRAYSCALE,
     "ppo_cnn_stacked_gray_corridor": GRAYSCALE,
+    "ppo_cnn_stacked_gray_deathmatch": GRAYSCALE,
     "ppo_late_fusion_gray_line": GRAYSCALE,
     "ppo_late_fusion_rgb_line": RGB,
     "ppo_late_fusion_rgb_center": RGB,
@@ -205,6 +212,7 @@ PPO_MODELS = {
     "ppo_cnn_rgb_center",
     "ppo_cnn_gray_corridor",
     "ppo_cnn_stacked_gray_corridor",
+    "ppo_cnn_stacked_gray_deathmatch",
     "ppo_late_fusion_gray_line",
     "ppo_late_fusion_rgb_line",
     "ppo_late_fusion_rgb_center",
@@ -228,6 +236,7 @@ FRAME_STACK_MODELS = {
     "q_rainbow_stacked_gray_corridor": DQNFrameStackRainbowGrayCorridor,
     "ppo_cnn_gray": PPOFrameStackGray,
     "ppo_cnn_stacked_gray_corridor": PPOFrameStack_CNNGrayCorridor,
+    "ppo_cnn_stacked_gray_deathmatch": PPOFrameStack_CNNGrayDeathmatch,
     "ppo_late_fusion_rgb": PPOFrameStackRGB,
     "ppo_late_fusion_rgb_corridor": PPOFrameStackRGBCorridor,
     "ppo_late_fusion_gray": PPOFrameStack_LateFusionGray,
@@ -249,6 +258,7 @@ FRAME_STACK_SIZE = {
     "ppo_cnn_stacked_gray_corridor": PPO_FRAME_STACK_SIZE_CNN_GRAY_CORRIDOR,
     "ppo_late_fusion_rgb": PPO_FRAME_STACK_SIZE_LATE_FUSION_RGB,
     "ppo_late_fusion_rgb_corridor": PPO_FRAME_STACK_SIZE_LATE_FUSION_RGB_CORRIDOR,
+    "ppo_cnn_stacked_gray_deathmatch": PPO_FRAME_STACK_SIZE_CNN_GRAY_DEATHMATCH,
     "ppo_late_fusion_gray": PPO_FRAME_STACK_SIZE_LATE_FUSION_GRAY,
     "ppo_late_fusion_gray_corridor": PPO_FRAME_STACK_SIZE_LATE_FUSION_GRAY_CORRIDOR,
     "ppo_late_fusion_gray_deathmatch": PPO_FRAME_STACK_SIZE_LATE_FUSION_GRAY_DEATHMATCH,
@@ -267,6 +277,7 @@ PPO_STATE_VAR_MODELS = {
     "ppo_late_fusion_rgb_center",
     "ppo_late_fusion_gray_corridor",
     "ppo_late_fusion_rgb_corridor",
+    "ppo_late_fusion_gray_deathmatch",
     "ppo_late_fusion_gray",
     "ppo_film_gray_center",
     "ppo_film_gray_corridor",

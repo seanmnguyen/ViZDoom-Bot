@@ -385,6 +385,76 @@ def _coerce_action_index(action: Any) -> int:
     return int(action)
 
 
+def _pythonize_action(action: Any) -> Any:
+    if isinstance(action, torch.Tensor):
+        action = action.detach().cpu().numpy()
+    if isinstance(action, np.ndarray):
+        if action.ndim == 0:
+            return action.item()
+        return action.tolist()
+    if isinstance(action, tuple):
+        return [_pythonize_action(x) for x in action]
+    if isinstance(action, list):
+        return [_pythonize_action(x) for x in action]
+    return action
+
+
+def _coerce_env_action_vector(action: Any) -> list[int]:
+    action = _pythonize_action(action)
+    if isinstance(action, (list, tuple)):
+        return [int(x) for x in action]
+    if isinstance(action, np.ndarray):
+        flat = np.asarray(action).reshape(-1).tolist()
+        return [int(x) for x in flat]
+    raise TypeError(f"Expected decoded environment action vector, got {type(action).__name__}: {action!r}")
+
+
+def _decode_factorized_env_action(raw_action: Any, action_mapper: Any, expected_len: int | None = None) -> list[int]:
+    if action_mapper is None:
+        raise RuntimeError("Factorized model requires an action mapper during evaluation, but none was attached.")
+
+    py_action = _pythonize_action(raw_action)
+
+    if expected_len is not None and isinstance(py_action, (list, tuple)):
+        if len(py_action) == expected_len and all(int(x) in (0, 1) for x in py_action):
+            return [int(x) for x in py_action]
+
+    for method_name in (
+        "decode",
+        "decode_action",
+        "to_env_action",
+        "to_action",
+        "joint_to_action",
+        "index_to_action",
+    ):
+        method = getattr(action_mapper, method_name, None)
+        if callable(method):
+            decoded = method(py_action)
+            try:
+                return _coerce_env_action_vector(decoded)
+            except TypeError:
+                pass
+
+    if hasattr(action_mapper, "actions"):
+        actions_attr = getattr(action_mapper, "actions")
+        try:
+            return _coerce_env_action_vector(actions_attr[_coerce_action_index(py_action)])
+        except Exception:
+            pass
+
+    raise RuntimeError(
+        "Could not decode factorized policy action via the mapper. "
+        f"Mapper type={type(action_mapper).__name__}, raw_action={py_action!r}"
+    )
+
+
+def resolve_env_action(model_type: str, raw_action: Any, actions: list[list[int]], action_mapper: Any | None) -> list[int]:
+    if model_type in getattr(MODELS, "FACTORIZED_ACTION_MAPPER", {}):
+        expected_len = len(actions[0]) if actions else None
+        return _decode_factorized_env_action(raw_action, action_mapper, expected_len=expected_len)
+    return actions[_coerce_action_index(raw_action)]
+
+
 def build_agent(model_type: str, agent_builder, model_path: Path, game: vzd.DoomGame, actions: list[list[int]]):
     factorized_mapper_by_model = getattr(MODELS, "FACTORIZED_ACTION_MAPPER", {})
 
@@ -411,7 +481,7 @@ def build_agent(model_type: str, agent_builder, model_path: Path, game: vzd.Doom
                     # Fine if constructor already loaded and a second load is not needed.
                     pass
                 _set_eval_mode(agent)
-                return agent
+                return agent, mapper
             except TypeError as exc:
                 last_error = exc
                 continue
@@ -422,9 +492,9 @@ def build_agent(model_type: str, agent_builder, model_path: Path, game: vzd.Doom
     if model_type in MODELS.PPO_MODELS:
         agent = agent_builder(action_size=len(actions), load_model_path=model_path)
         _set_eval_mode(agent)
-        return agent
+        return agent, None
 
-    if model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL:
+    if model_type == "q_rainbow_stacked":
         agent = agent_builder(
             action_size=len(actions),
             lr=learning_rate,
@@ -435,7 +505,7 @@ def build_agent(model_type: str, agent_builder, model_path: Path, game: vzd.Doom
         state_dict = _load_weights_state_dict(model_path, DEVICE)
         agent.q_net.load_state_dict(state_dict)
         _set_eval_mode(agent)
-        return agent
+        return agent, None
 
     agent = agent_builder(
         len(actions),
@@ -447,7 +517,7 @@ def build_agent(model_type: str, agent_builder, model_path: Path, game: vzd.Doom
         model_weights=model_path,
     )
     _set_eval_mode(agent)
-    return agent
+    return agent, None
 
 
 @dataclass
@@ -459,6 +529,7 @@ class EvalContext:
     preprocess_fn: Any
     use_frame_stack: bool
     frame_stack: Any
+    action_mapper: Any | None
 
 
 def build_eval_context(entry: ManifestEntry, visible_window: bool) -> EvalContext:
@@ -504,14 +575,11 @@ def build_eval_context(entry: ManifestEntry, visible_window: bool) -> EvalContex
     game.init()
 
     n = game.get_available_buttons_size()
-    # TODO: special exception for ppo_late_fusion_gray_line because of non-conformity (smh)
-    if model_type == "ppo_late_fusion_rgb_line":
-        n = 3
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
     if model_type == "ppo_late_fusion_rgb_corridor":
         actions = ppo_late_fusion_rgb_corridor.get_deadly_corridor_actions()
 
-    agent = build_agent(model_type, agent_builder, model_path, game, actions)
+    agent, action_mapper = build_agent(model_type, agent_builder, model_path, game, actions)
 
     use_frame_stack = model_type in MODELS.FRAME_STACK_MODELS
     if use_frame_stack:
@@ -536,6 +604,7 @@ def build_eval_context(entry: ManifestEntry, visible_window: bool) -> EvalContex
         preprocess_fn=preprocess_fn,
         use_frame_stack=use_frame_stack,
         frame_stack=frame_stack,
+        action_mapper=action_mapper,
     )
 
 
@@ -577,6 +646,7 @@ def evaluate_model(entry: ManifestEntry, ctx: EvalContext, episodes: int, visibl
     preprocess_fn = ctx.preprocess_fn
     use_frame_stack = ctx.use_frame_stack
     frame_stack = ctx.frame_stack
+    action_mapper = ctx.action_mapper
 
     _set_eval_mode(agent)
     scores: list[float] = []
@@ -619,21 +689,18 @@ def evaluate_model(entry: ManifestEntry, ctx: EvalContext, episodes: int, visibl
             if model_type in MODELS.PPO_MODELS:
                 if model_type in MODELS.PPO_STATE_VAR_MODELS:
                     state_vars = preprocess_state_vars(model_type, gs.game_variables, expected_num_vars, agent)
-                    # TODO: special exception for ppo_late_fusion_gray_line because of non-conformity (smh)
-                    if model_type in ("ppo_late_fusion_gray_line", "ppo_late_fusion_rgb_line"):
-                        action_idx = agent.get_action(state_img, deterministic=True)
-                    else:
-                        action_idx = agent.get_action(state_img, state_vars, deterministic=True)
+                    raw_action = agent.get_action(state_img, state_vars, deterministic=True)
                 else:
-                    action_idx = agent.get_action(state_img, deterministic=True)
+                    raw_action = agent.get_action(state_img, deterministic=True)
             else:
                 state_vars = preprocess_state_vars(model_type, gs.game_variables, expected_num_vars, agent)
                 try:
-                    action_idx = agent.get_action(state_img, state_vars, eval_mode=True)
+                    raw_action = agent.get_action(state_img, state_vars, eval_mode=True)
                 except TypeError:
-                    action_idx = agent.get_action(state_img, state_vars)
+                    raw_action = agent.get_action(state_img, state_vars)
 
-            game.make_action(actions[_coerce_action_index(action_idx)], frame_repeat)
+            env_action = resolve_env_action(model_type, raw_action, actions, action_mapper)
+            game.make_action(env_action, frame_repeat)
 
         score = float(game.get_total_reward())
         scores.append(score)
@@ -682,6 +749,7 @@ def main():
         print(f"Weights  : {entry.model_path}")
 
         if entry.skip is True:
+            print("Skipping!")
             continue
 
         ctx: Optional[EvalContext] = None
