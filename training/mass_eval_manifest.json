@@ -38,21 +38,144 @@
     },
 
     {
+      "model_type": "q_late_fusion_gray_center",
+      "scenario": "defend_the_center",
+      "model_filename": "q_late_fusion_gray_best.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "q_late_fusion_rgb",
+      "scenario": "defend_the_center",
+      "model_filename": "q_late_fusion_rgb_best.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "q_cnn",
+      "scenario": "defend_the_center",
+      "model_filename": "q_cnn_gray_best.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "q_cnn_rgb",
+      "scenario": "defend_the_center",
+      "model_filename": "q_cnn_rgb_best.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "ppo_late_fusion_rgb_center",
+      "scenario": "defend_the_center",
+      "model_filename": "ppo_late_fusion_rgb_center.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "ppo_late_fusion_rgb",
+      "scenario": "defend_the_center",
+      "model_filename": "ppo_late_fusion_rgb.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "ppo_late_fusion_gray",
+      "scenario": "defend_the_center",
+      "model_filename": "ppo_late_fusion_gray.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "ppo_film_gray_center",
+      "scenario": "defend_the_center",
+      "model_filename": "ppo_film_gray.pth",
+      "skip": "False"
+    },
+    {
       "model_type": "ppo_cnn_gray",
       "scenario": "defend_the_center",
       "model_filename": "ppo_cnn_gray.pth",
       "skip": "False"
     },
     {
-      "model_type": "q_rainbow_stacked",
-      "scenario": "defend_the_center.cfg",
-      "model_filename": "q_rainbow_stacked.pth",
+      "model_type": "ppo_cnn_rgb_center",
+      "scenario": "defend_the_center",
+      "model_filename": "ppo_cnn_rgb_center.pth",
       "skip": "False"
     },
     {
-      "model_type": "q_late_fusion_rgb",
-      "scenario": "defend_the_center",
-      "model_filename": "q_late_fusion_rgb.pth",
+      "model_type": "q_rainbow_rgb",
+      "scenario": "defend_the_center.cfg",
+      "model_filename": "q_rainbow_rgb.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "q_rainbow_stacked_gray_center",
+      "scenario": "defend_the_center.cfg",
+      "model_filename": "q_rainbow_stacked_gray.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "q_rainbow_stacked_rgb_center",
+      "scenario": "defend_the_center.cfg",
+      "model_filename": "q_rainbow_stacked_rgb.pth",
+      "skip": "False"
+    },
+
+    {
+      "model_type": "ppo_cnn_gray_corridor",
+      "scenario": "deadly_corridor",
+      "model_filename": "ppo_cnn_gray.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "ppo_cnn_stacked_gray_corridor",
+      "scenario": "deadly_corridor",
+      "model_filename": "ppo_cnn_gray_stacked.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "ppo_late_fusion_rgb_corridor",
+      "scenario": "deadly_corridor",
+      "model_filename": "ppo_late_fusion_rgb.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "ppo_late_fusion_gray_corridor",
+      "scenario": "deadly_corridor",
+      "model_filename": "ppo_late_fusion_gray.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "ppo_film_gray_corridor",
+      "scenario": "deadly_corridor",
+      "model_filename": "ppo_film_gray.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "q_rainbow_stacked_gray_corridor",
+      "scenario": "deadly_corridor.cfg",
+      "model_filename": "q_rainbow_stacked_gray.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "ppo_film_gray_deathmatch",
+      "scenario": "deathmatch",
+      "model_filename": "ppo_film_gray.pth",
+      "skip": "False"
+    },
+
+
+    {
+      "model_type": "ppo_film_gray_deathmatch",
+      "scenario": "deathmatch",
+      "model_filename": "ppo_film_gray.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "ppo_film_gray_deathmatch",
+      "scenario": "deathmatch",
+      "model_filename": "ppo_film_gray.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "ppo_film_gray_deathmatch",
+      "scenario": "deathmatch",
+      "model_filename": "ppo_film_gray.pth",
       "skip": "False"
     }
   ]
