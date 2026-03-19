@@ -173,7 +173,12 @@ def evaluate(game: vzd.DoomGame, agent, actions, *, model_type: str, resolution,
                         state_vars = ppo_film_factorized_gray.preprocess_vars_safe_general(gs.game_variables, ppo_film_factorized_gray.NUM_VARS, normalizer=agent.vars_rms, update=False, clip=5.0)
                     else:
                         state_vars = preprocess_vars_safe(gs.game_variables, expected_num_vars)
-                    a = agent.get_action(state_img, state_vars, deterministic=True)
+                    
+                    # TODO: special exception for ppo_late_fusion_gray_line because of non-conformity (smh)
+                    if model_type in ("ppo_late_fusion_gray_line", "ppo_late_fusion_rgb_line"):
+                        a = agent.get_action(state_img, deterministic=True)
+                    else:
+                        a = agent.get_action(state_img, state_vars, deterministic=True)
                 else:
                     a = agent.get_action(state_img, deterministic=True)
             else:
@@ -316,6 +321,8 @@ if __name__ == "__main__":
 
     # Build action space
     n = game.get_available_buttons_size()
+    if args.scenario == "defend_the_line":
+        n = 5
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
     # TODO: special exception for this model since it uses custom actions
     if args.model_type == "ppo_late_fusion_rgb_corridor":

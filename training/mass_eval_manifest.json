@@ -1,0 +1,59 @@
+{
+  "models": [
+    {
+      "model_type": "q_late_fusion_rgb",
+      "scenario": "defend_the_line",
+      "model_filename": "q_late_fusion_rgb.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "q_cnn",
+      "scenario": "defend_the_line",
+      "model_filename": "q_cnn.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "q_cnn_rgb",
+      "scenario": "defend_the_line",
+      "model_filename": "q_cnn_rgb.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "ppo_late_fusion_gray_line",
+      "scenario": "defend_the_line",
+      "model_filename": "ppo_late_fusion_gray.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "ppo_late_fusion_rgb_line",
+      "scenario": "defend_the_line",
+      "model_filename": "ppo_late_fusion_rgb.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "ppo_cnn_gray_line",
+      "scenario": "defend_the_line",
+      "model_filename": "ppo_cnn_line_rgb.pth",
+      "skip": "True"
+    },
+
+    {
+      "model_type": "ppo_cnn_gray",
+      "scenario": "defend_the_center",
+      "model_filename": "ppo_cnn_gray.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "q_rainbow_stacked",
+      "scenario": "defend_the_center.cfg",
+      "model_filename": "q_rainbow_stacked.pth",
+      "skip": "False"
+    },
+    {
+      "model_type": "q_late_fusion_rgb",
+      "scenario": "defend_the_center",
+      "model_filename": "q_late_fusion_rgb.pth",
+      "skip": "False"
+    }
+  ]
+}

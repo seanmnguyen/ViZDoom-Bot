@@ -12,9 +12,12 @@ from q_rainbow_stacked import FrameStack as DQNFrameStackRainbow
 from q_rainbow_stacked import FRAME_STACK_SIZE as DQN_FRAME_STACK_SIZE_RAINBOW
 import q_rainbow_stacked as rainbow_lazy_mod
 from ppo_cnn import PPOAgent
+# from ppo_cnn_rgb import PPOAgent as PPOAgent_CNNRGBLine
 from ppo_cnn_gray import PPOAgent as PPOAgent_Gray
 from ppo_cnn_gray import FrameStack as PPOFrameStackGray
 from ppo_cnn_gray import FRAME_STACK_SIZE as PPO_FRAME_STACK_SIZE_CNN_GRAY
+from ppo_late_fusion_gray_line import PPOAgent as PPOAgent_LateFusionGrayLine
+from ppo_late_fusion_rgb_line import PPOAgent as PPOAgent_LateFusionRGBLine
 from ppo_cnn_rgb_center import PPOAgent as PPOAgent_CNNRGBCenter
 from ppo_late_fusion_rgb_center import PPOAgent as PPOAgent_LateFusionRGBCenter
 from ppo_cnn_deadly_corridor_gray import PPOAgent as PPOAgent_CNNDeadlyCorridorGray
@@ -48,9 +51,12 @@ MODEL_DEFAULT_SCENARIO = {
     "q_cnn_rgb": "defend_the_line.cfg",
     "q_late_fusion": "defend_the_center.cfg",
     "q_late_fusion_rgb": "defend_the_center.cfg",
-    "ppo_cnn": "defend_the_line.cfg",
+    "ppo_cnn_gray_line": "defend_the_line.cfg",
+    "ppo_cnn_rgb_line": "defend_the_line.cfg",
     "ppo_cnn_gray": "defend_the_center.cfg",
     "ppo_cnn_rgb_center": "defend_the_center.cfg",
+    "ppo_late_fusion_gray_line": "defend_the_line.cfg",
+    "ppo_late_fusion_rgb_line": "defend_the_line.cfg",
     "ppo_late_fusion_rgb_center": "defend_the_center.cfg",
     "q_late_fusion_rgb_DC": "deadly_corridor.cfg",
     "q_rainbow_rgb": "defend_the_center.cfg",
@@ -69,9 +75,13 @@ AGENT_BY_MODEL = {
     "q_cnn_rgb": DQNAgent_CNNRGB,
     "q_late_fusion": DQNAgent_LateFusion,
     "q_late_fusion_rgb": DQNAgent_LateFusionRGB,
-    "ppo_cnn": PPOAgent,
+    "ppo_cnn_gray_line": PPOAgent,
+    # "ppo_cnn_rgb_line": PPOAgent_CNNRGBLine,
+    "ppo_cnn_rgb_line": PPOAgent_CNNRGBCenter,
     "ppo_cnn_gray": PPOAgent_Gray,
     "ppo_cnn_rgb_center": PPOAgent_CNNRGBCenter,
+    "ppo_late_fusion_gray_line": PPOAgent_LateFusionGrayLine,
+    "ppo_late_fusion_rgb_line": PPOAgent_LateFusionRGBLine,
     "ppo_late_fusion_rgb_center": PPOAgent_LateFusionRGBCenter,
     "q_late_fusion_rgb_DC": DQNAgent_LateFusionRGB,
     "q_rainbow_rgb": DQNAgent_RainbowRGB,
@@ -90,9 +100,12 @@ RESOLUTION_BY_MODEL = {
     "q_cnn_rgb": (96, 128),
     "q_late_fusion": (96, 128),
     "q_late_fusion_rgb": (96, 128),
-    "ppo_cnn": (30, 45),
+    "ppo_cnn_gray_line": (30, 45),
+    "ppo_cnn_rgb_line": (30, 45),
     "ppo_cnn_gray": (96, 128),
     "ppo_cnn_rgb_center": (30, 45),
+    "ppo_late_fusion_gray_line": (30, 45),
+    "ppo_late_fusion_rgb_line": (30, 45),
     "ppo_late_fusion_rgb_center": (30, 45),
     "q_late_fusion_rgb_DC": (96, 128),
     "q_rainbow_rgb": (96, 128),
@@ -114,9 +127,12 @@ COLOR_BY_MODEL = {
     "q_cnn_rgb": RGB,
     "q_late_fusion": GRAYSCALE,
     "q_late_fusion_rgb": RGB,
-    "ppo_cnn": GRAYSCALE,
+    "ppo_cnn_gray_line": GRAYSCALE,
+    "ppo_cnn_rgb_line": RGB,
     "ppo_cnn_gray": GRAYSCALE,
     "ppo_cnn_rgb_center": RGB,
+    "ppo_late_fusion_gray_line": GRAYSCALE,
+    "ppo_late_fusion_rgb_line": RGB,
     "ppo_late_fusion_rgb_center": RGB,
     "q_late_fusion_rgb_DC": RGB,
     "q_rainbow_rgb": RGB,
@@ -131,9 +147,12 @@ COLOR_BY_MODEL = {
 }
 
 PPO_MODELS = {
-    "ppo_cnn",
+    "ppo_cnn_gray_line",
+    "ppo_cnn_rgb_line",
     "ppo_cnn_gray",
     "ppo_cnn_rgb_center",
+    "ppo_late_fusion_gray_line",
+    "ppo_late_fusion_rgb_line",
     "ppo_late_fusion_rgb_center",
     "ppo_cnn_deadly_corridor_gray",
     "ppo_late_fusion_rgb",
@@ -171,6 +190,8 @@ FRAME_STACK_SIZE = {
 # Late-fusion PPO models (need state_vars in get_action)
 PPO_STATE_VAR_MODELS = {
     "ppo_late_fusion_rgb",
+    "ppo_late_fusion_gray_line",
+    "ppo_late_fusion_rgb_line",
     "ppo_late_fusion_rgb_center",
     "ppo_late_fusion_rgb_corridor",
     "ppo_late_fusion_gray",

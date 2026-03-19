@@ -109,6 +109,7 @@ class ManifestEntry:
     model_type: str
     scenario_cfg: str
     model_filename: str
+    skip: str
 
     @property
     def scenario_stem(self) -> str:
@@ -210,6 +211,7 @@ def _coerce_manifest_entries(raw: Any) -> list[ManifestEntry]:
             model_type = str(_first_present(item, ("model_type", "type"))).strip()
             scenario = normalize_scenario_name(_first_present(item, ("scenario", "scenario_name")))
             model_filename = str(_first_present(item, ("model_filename", "filename", "model_file", "weights"))).strip()
+            skip = str2bool(_first_present(item, ("skip",)).strip().lower())
         except Exception as exc:
             raise ValueError(f"Invalid manifest entry #{idx}: {exc}") from exc
 
@@ -230,6 +232,7 @@ def _coerce_manifest_entries(raw: Any) -> list[ManifestEntry]:
                 model_type=model_type,
                 scenario_cfg=scenario,
                 model_filename=model_filename,
+                skip=skip
             )
         )
 
@@ -498,6 +501,9 @@ def build_eval_context(entry: ManifestEntry, visible_window: bool) -> EvalContex
     game.init()
 
     n = game.get_available_buttons_size()
+    # TODO: special exception for ppo_late_fusion_gray_line because of non-conformity (smh)
+    if model_type == "ppo_late_fusion_rgb_line":
+        n = 3
     actions = [list(a) for a in it.product([0, 1], repeat=n)]
     if model_type == "ppo_late_fusion_rgb_corridor":
         actions = ppo_late_fusion_rgb_corridor.get_deadly_corridor_actions()
@@ -608,7 +614,11 @@ def evaluate_model(entry: ManifestEntry, ctx: EvalContext, episodes: int, visibl
             if model_type in MODELS.PPO_MODELS:
                 if model_type in MODELS.PPO_STATE_VAR_MODELS:
                     state_vars = preprocess_state_vars(model_type, gs.game_variables, expected_num_vars, agent)
-                    action_idx = agent.get_action(state_img, state_vars, deterministic=True)
+                    # TODO: special exception for ppo_late_fusion_gray_line because of non-conformity (smh)
+                    if model_type in ("ppo_late_fusion_gray_line", "ppo_late_fusion_rgb_line"):
+                        action_idx = agent.get_action(state_img, deterministic=True)
+                    else:
+                        action_idx = agent.get_action(state_img, state_vars, deterministic=True)
                 else:
                     action_idx = agent.get_action(state_img, deterministic=True)
             else:
@@ -665,6 +675,9 @@ def main():
         print(f"[{idx}/{len(manifest_entries)}] Evaluating {entry.model_type}")
         print(f"Scenario : {entry.scenario_cfg}")
         print(f"Weights  : {entry.model_path}")
+
+        if entry.skip is True:
+            continue
 
         ctx: Optional[EvalContext] = None
         try:
