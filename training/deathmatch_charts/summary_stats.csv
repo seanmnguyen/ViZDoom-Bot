@@ -1,0 +1,5 @@
+model,n,mean,std,ci_low,ci_high,display_name,algorithm,visual_input,architecture,frame_stacked,is_baseline,is_best
+../models/deathmatch/ppo_film_gray.pth,1004,23.56628307973246,23.280128582726874,22.167765026928418,25.050570928338036,ppo_film_gray,PPO,Grayscale,FiLM,True,False,True
+../models/deathmatch/ppo_late_fusion_gray.pth,1004,21.771983277750206,22.67049197788727,20.39394371124853,23.177684412439504,ppo_late_fusion_gray,PPO,Grayscale,LateFusion,True,False,False
+../models/deathmatch/ppo_film_factorized_gray2.pth,1004,8.474612597925255,12.258466017015271,7.732674970973535,9.222230699741507,ppo_film_factorized_gray,PPO,Grayscale,FiLM,True,False,False
+random,1004,5.506580702655709,8.292957903464506,5.003970592629482,6.040034188077364,random,Random,,Random,False,True,False

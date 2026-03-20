@@ -1,0 +1,5 @@
+model,delta_mean,delta_low,delta_high,display_name,algorithm,visual_input,architecture,frame_stacked,is_baseline
+../models/deathmatch/ppo_film_gray.pth,18.059702377076754,16.580194715368986,19.595542910932828,ppo_film_gray,PPO,Grayscale,FiLM,True,False
+../models/deathmatch/ppo_late_fusion_gray.pth,16.265402575094498,14.773536434201144,17.781456276707075,ppo_late_fusion_gray,PPO,Grayscale,LateFusion,True,False
+../models/deathmatch/ppo_film_factorized_gray2.pth,2.9680318952695455,2.0567723831587252,3.9059756689580785,ppo_film_factorized_gray,PPO,Grayscale,FiLM,True,False
+random,0.0,-0.6894221131613231,0.7279597579552127,random,Random,,Random,False,True
