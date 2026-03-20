@@ -121,6 +121,16 @@ python3 eval_models.py -sc deathmatch -n 10 -s true -mt ppo_film_gray_deathmatch
 
 _Note: for this model type, you need to import the weight file from the Google Drive._
 
+### Baseline
+
+You can run a baseline model in each scenario. This model makes random actions across every possible action combination, serving as a comparison to our trained models.
+
+Run this command to get the baseline model, where `<scenario>` is one of the four scenarios:
+
+```
+python3 eval_models.py -sc deathmatch -n 10 -s true -mt random
+```
+
 ## Additional Resources
 
 We have included demo runs for each scenario, including one video for the best agent and one video for the baseline model (making random actions). These can be found in this [Google Drive Folder](https://drive.google.com/drive/folders/1M7n5V2MVEMQJHNlJ4oXoK6Q-FOsC_zDB?usp=sharing)
