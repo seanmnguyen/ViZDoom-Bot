@@ -297,8 +297,8 @@ if __name__ == "__main__":
         sys.exit(0)
 
     # Import lazy module
-    if model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL:
-        rainbow_lazy_mod = MODELS.LAZY_STACK_MODULE_BY_MODEL[model_type]
+    if args.model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL:
+        rainbow_lazy_mod = MODELS.LAZY_STACK_MODULE_BY_MODEL[args.model_type]
 
     # Match demo.py's screen format selection, but allow AUTO for modules that self-toggle RGB/Gray
     color_mode = MODELS.COLOR_BY_MODEL[args.model_type]
@@ -371,7 +371,7 @@ if __name__ == "__main__":
     if use_frame_stack:
         if args.model_type in MODELS.LAZY_STACK_MODULE_BY_MODEL:
             # Uses its own stacker: stores uint8 frames (C,H,W) and concatenates to (C*K,H,W).
-            rainbow_lazy_mod = MODELS.LAZY_STACK_MODULE_BY_MODEL[model_type]
+            rainbow_lazy_mod = MODELS.LAZY_STACK_MODULE_BY_MODEL[args.model_type]
             frame_stack = rainbow_lazy_mod.FrameStack(
                 rainbow_lazy_mod.FRAME_STACK_SIZE,
                 rainbow_lazy_mod.FRAME_C,

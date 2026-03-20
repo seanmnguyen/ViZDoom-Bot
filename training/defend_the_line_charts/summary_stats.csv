@@ -1,0 +1,7 @@
+model,n,mean,std,ci_low,ci_high,display_name,algorithm,visual_input,architecture,frame_stacked,is_baseline,is_best
+../models/defend_the_line/ppo_late_fusion_gray.pth,3004,29.88429766806083,9.5925177286087,29.544596980780007,30.234986552782605,ppo_late_fusion_gray,PPO,Grayscale,LateFusion,False,False,True
+../models/defend_the_line/q_cnn_rgb.pth,3004,19.62107332203582,7.104160511742625,19.36615918327108,19.87020094270474,q_cnn_rgb,Q-Learning,RGB,CNN,False,False,False
+../models/defend_the_line/q_late_fusion_rgb.pth,3004,16.401340059370558,6.250323581837681,16.181090213042918,16.61972055205016,q_late_fusion_rgb,Q-Learning,RGB,LateFusion,False,False,False
+random,3004,10.517537013621551,5.180975218666884,10.333604560041644,10.706299976892744,random,Random,,Random,False,True,False
+../models/defend_the_line/q_cnn.pth,3004,6.219976539856267,3.6022473943919238,6.0916053212276315,6.346947631263701,q_cnn,Q-Learning,Grayscale,CNN,False,False,False
+../models/defend_the_line/ppo_late_fusion_rgb.pth,3004,2.811574341215878,2.1677169797784774,2.7363512759738056,2.8918033634259124,ppo_late_fusion_rgb,PPO,RGB,LateFusion,False,False,False

@@ -1,0 +1,7 @@
+model,delta_mean,delta_low,delta_high,display_name,algorithm,visual_input,architecture,frame_stacked,is_baseline
+../models/defend_the_line/ppo_late_fusion_gray.pth,19.366760654439283,18.965262492722275,19.754384375526406,ppo_late_fusion_gray,PPO,Grayscale,LateFusion,False,False
+../models/defend_the_line/q_cnn_rgb.pth,9.103536308414268,8.790944833236622,9.393665396275944,q_cnn_rgb,Q-Learning,RGB,CNN,False,False
+../models/defend_the_line/q_late_fusion_rgb.pth,5.883803045749007,5.583751299941862,6.1765282047822305,q_late_fusion_rgb,Q-Learning,RGB,LateFusion,False,False
+random,0.0,-0.2728728488037671,0.2603942940067098,random,Random,,Random,False,True
+../models/defend_the_line/q_cnn.pth,-4.297560473765284,-4.52895337079244,-4.076710766000744,q_cnn,Q-Learning,Grayscale,CNN,False,False
+../models/defend_the_line/ppo_late_fusion_rgb.pth,-7.705962672405673,-7.903208599091755,-7.500177218195005,ppo_late_fusion_rgb,PPO,RGB,LateFusion,False,False
