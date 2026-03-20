@@ -50,6 +50,9 @@ from ppo_late_fusion_gray_corridor import FRAME_STACK_SIZE as PPO_FRAME_STACK_SI
 from ppo_late_fusion_gray_deathmatch import PPOAgent as PPOAgent_LateFusionGrayDeathmatch
 from ppo_late_fusion_gray_deathmatch import FrameStack as PPOFrameStack_LateFusionGrayDeathmatch
 from ppo_late_fusion_gray_deathmatch import FRAME_STACK_SIZE as PPO_FRAME_STACK_SIZE_LATE_FUSION_GRAY_DEATHMATCH
+from ppo_film_gray_line import PPOAgent as PPOAgent_FiLMGrayLine
+from ppo_film_gray_line import FrameStack as PPOFrameStack_FiLMGrayLine
+from ppo_film_gray_line import FRAME_STACK_SIZE as PPO_FRAME_STACK_SIZE_FILM_GRAY_LINE
 from ppo_film_gray_center import PPOAgent as PPOAgent_FiLMGrayCenter
 from ppo_film_gray_center import FrameStack as PPOFrameStack_FiLMGrayCenter
 from ppo_film_gray_center import FRAME_STACK_SIZE as PPO_FRAME_STACK_SIZE_FILM_GRAY_CENTER
@@ -98,6 +101,7 @@ MODEL_DEFAULT_SCENARIO = {
     "ppo_late_fusion_gray": "defend_the_center.cfg",
     "ppo_late_fusion_gray_corridor": "deadly_corridor.cfg",
     "ppo_late_fusion_gray_deathmatch": "deathmatch.cfg",
+    "ppo_film_gray_line": "defend_the_line.cfg",
     "ppo_film_gray_center": "defend_the_center.cfg",
     "ppo_film_gray_corridor": "deadly_corridor.cfg",
     "ppo_film_gray_deathmatch": "deathmatch.cfg",
@@ -129,6 +133,7 @@ AGENT_BY_MODEL = {
     "ppo_late_fusion_gray": PPOAgent_LateFusionGray,
     "ppo_late_fusion_gray_corridor": PPOAgent_LateFusionGrayCorridor,
     "ppo_late_fusion_gray_deathmatch": PPOAgent_LateFusionGrayDeathmatch,
+    "ppo_film_gray_line": PPOAgent_FiLMGrayLine,
     "ppo_film_gray_center": PPOAgent_FiLMGrayCenter,
     "ppo_film_gray_corridor": PPOAgent_FiLMGrayCorridor,
     "ppo_film_gray_deathmatch": PPOAgent_FiLMGrayDeathmatch,
@@ -162,6 +167,7 @@ RESOLUTION_BY_MODEL = {
     "ppo_late_fusion_gray": (96, 128),
     "ppo_late_fusion_gray_corridor": (96, 128),
     "ppo_late_fusion_gray_deathmatch": (96, 128),
+    "ppo_film_gray_line": (96, 128),
     "ppo_film_gray_center": (96, 128),
     "ppo_film_gray_corridor": (96, 128),
     "ppo_film_gray_deathmatch": (96, 128),
@@ -198,6 +204,7 @@ COLOR_BY_MODEL = {
     "ppo_late_fusion_gray": GRAYSCALE,
     "ppo_late_fusion_gray_corridor": GRAYSCALE,
     "ppo_late_fusion_gray_deathmatch": GRAYSCALE,
+    "ppo_film_gray_line": GRAYSCALE,
     "ppo_film_gray_center": GRAYSCALE,
     "ppo_film_gray_corridor": GRAYSCALE,
     "ppo_film_gray_deathmatch": GRAYSCALE,
@@ -222,6 +229,7 @@ PPO_MODELS = {
     "ppo_late_fusion_gray",
     "ppo_late_fusion_gray_corridor",
     "ppo_late_fusion_gray_deathmatch",
+    "ppo_film_gray_line",
     "ppo_film_gray_center",
     "ppo_film_gray_corridor",
     "ppo_film_gray_deathmatch",
@@ -242,6 +250,7 @@ FRAME_STACK_MODELS = {
     "ppo_late_fusion_gray": PPOFrameStack_LateFusionGray,
     "ppo_late_fusion_gray_corridor": PPOFrameStack_LateFusionGrayCorridor,
     "ppo_late_fusion_gray_deathmatch": PPOFrameStack_LateFusionGrayDeathmatch,
+    "ppo_film_gray_line": PPOFrameStack_FiLMGrayLine,
     "ppo_film_gray_center": PPOFrameStack_FiLMGrayCenter,
     "ppo_film_gray_corridor": PPOFrameStack_FiLMGrayCorridor,
     "ppo_film_gray_deathmatch": PPOFrameStack_FiLMGrayDeathmatch,
@@ -262,6 +271,7 @@ FRAME_STACK_SIZE = {
     "ppo_late_fusion_gray": PPO_FRAME_STACK_SIZE_LATE_FUSION_GRAY,
     "ppo_late_fusion_gray_corridor": PPO_FRAME_STACK_SIZE_LATE_FUSION_GRAY_CORRIDOR,
     "ppo_late_fusion_gray_deathmatch": PPO_FRAME_STACK_SIZE_LATE_FUSION_GRAY_DEATHMATCH,
+    "ppo_film_gray_line": PPO_FRAME_STACK_SIZE_FILM_GRAY_LINE,
     "ppo_film_gray_center": PPO_FRAME_STACK_SIZE_FILM_GRAY_CENTER,
     "ppo_film_gray_corridor": PPO_FRAME_STACK_SIZE_FILM_GRAY_CORRIDOR,
     "ppo_film_gray_deathmatch": PPO_FRAME_STACK_SIZE_FILM_GRAY_DEATHMATCH,
@@ -279,6 +289,7 @@ PPO_STATE_VAR_MODELS = {
     "ppo_late_fusion_rgb_corridor",
     "ppo_late_fusion_gray_deathmatch",
     "ppo_late_fusion_gray",
+    "ppo_film_gray_line",
     "ppo_film_gray_center",
     "ppo_film_gray_corridor",
     "ppo_film_gray_deathmatch",
