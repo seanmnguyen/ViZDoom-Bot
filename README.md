@@ -118,6 +118,13 @@ We have included demo runs for each scenario, including one video for the best a
 
 This folder also includes the weight files for Deathmatch PPO FiLM in grayscale (`ppo_film_gray.pth`) and PPO LateFusion in grayscale (`ppo_late_fusion_gray.pth`). These weights were too large to be uploaded to the GitHub repo, so they must be accessed here instead. Simply download the both files and move them to `/models/deathmatch/`.
 
+Finally, the results of our model evaluation over 1000-3000 episodes can be found in the `model_eval_data_<scenario>.xlsx` spreadsheets. Note, the file names use an abbreviation of the scenarios, as specified below:
+
+- dtl = defend_the_line
+- dtc = defend_the_center
+- dc = deadly_corridor
+- dm = deathmatch
+
 ## ViZDoom Credit
 
 Below is the remainder of the README from the ViZDoom project, including an overview of the ViZDoom project, installation guides, and additional information. This project was built on top of the Farma Foundation's ViZDoom, which included the groundwork environment, various Doom scenarios, and examples of how to build and train AI agents.
