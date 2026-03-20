@@ -1,0 +1,15 @@
+model,delta_mean,delta_low,delta_high,display_name,algorithm,visual_input,architecture,frame_stacked,is_baseline
+../models/defend_the_center/ppo_late_fusion_gray.pth,20.694813881227656,20.514602720501422,20.8697994166972,ppo_late_fusion_gray,PPO,Grayscale,LateFusion,True,False
+../models/defend_the_center/ppo_film_gray.pth,20.399117736667712,20.203886730258052,20.588363068406846,ppo_film_gray,PPO,Grayscale,FiLM,False,False
+../models/defend_the_center/ppo_cnn_gray.pth,15.450969347406158,15.24834618359931,15.64867438951365,ppo_cnn_gray,PPO,Grayscale,CNN,True,False
+../models/defend_the_center/q_rainbow_rgb.pth,7.0214472149125715,6.866340641207391,7.177249430148651,q_rainbow_rgb,Q-Learning,RGB,Rainbow,False,False
+../models/defend_the_center/ppo_late_fusion_rgb.pth,5.466903793112178,5.279571273243285,5.66113397961748,ppo_late_fusion_rgb,PPO,RGB,LateFusion,True,False
+../models/defend_the_center/q_cnn_rgb_best.pth,3.740498414042899,3.618717945465053,3.858279952875052,q_cnn_rgb,Q-Learning,RGB,CNN,False,False
+../models/defend_the_center/q_rainbow_stacked_gray.pth,3.736263580733999,3.5832357099741423,3.890248521990755,q_rainbow_stacked_gray,Q-Learning,Grayscale,Rainbow,True,False
+../models/defend_the_center/q_late_fusion_rgb_best.pth,3.5426511087393484,3.4086200556518405,3.6812742922349986,q_late_fusion_rgb,Q-Learning,RGB,LateFusion,False,False
+../models/defend_the_center/q_late_fusion_gray_best.pth,3.2208318155490643,3.071711703183642,3.3764446771579064,q_late_fusion_gray,Q-Learning,Grayscale,LateFusion,False,False
+../models/defend_the_center/q_cnn_gray_best.pth,2.7605327722451225,2.64621016775442,2.8849746702372046,q_cnn_gray,Q-Learning,Grayscale,CNN,False,False
+../models/defend_the_center/q_rainbow_stacked_rgb.pth,2.1289931717037307,1.9813709132984432,2.2761017087219115,q_rainbow_stacked_rgb,Q-Learning,RGB,Rainbow,True,False
+../models/defend_the_center/ppo_late_fusion_rgb_center.pth,0.9946601700388207,0.8800029334119595,1.1109284199306901,ppo_late_fusion_rgb,PPO,RGB,LateFusion,False,False
+random,0.0,-0.12903106954242533,0.12677922636738143,random,Random,,Random,False,True
+../models/defend_the_center/ppo_cnn_rgb_center.pth,-1.6248665677055314,-1.7283054123273365,-1.5255138952793899,ppo_cnn_rgb,PPO,RGB,CNN,False,False

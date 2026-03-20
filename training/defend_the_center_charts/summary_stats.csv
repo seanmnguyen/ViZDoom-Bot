@@ -1,0 +1,15 @@
+model,n,mean,std,ci_low,ci_high,display_name,algorithm,visual_input,architecture,frame_stacked,is_baseline,is_best
+../models/defend_the_center/ppo_late_fusion_gray.pth,1004,21.979408636748552,2.4474746021805003,21.822386096530703,22.129501549757094,ppo_late_fusion_gray,PPO,Grayscale,LateFusion,True,False,True
+../models/defend_the_center/ppo_film_gray.pth,1004,21.683712492188608,2.830331719873692,21.506598624094313,21.85475513739771,ppo_film_gray,PPO,Grayscale,FiLM,False,False,False
+../models/defend_the_center/ppo_cnn_gray.pth,1004,16.735564102927054,2.8174519723339633,16.564236753341923,16.90513187313816,ppo_cnn_gray,PPO,Grayscale,CNN,True,False,False
+../models/defend_the_center/q_rainbow_rgb.pth,1004,8.306041970433467,1.9768383310794688,8.183576547535528,8.43217199741013,q_rainbow_rgb,Q-Learning,RGB,Rainbow,False,False,False
+../models/defend_the_center/ppo_late_fusion_rgb.pth,1004,6.751498548633074,2.7698559735475916,6.5826693227091635,6.9250537850467335,ppo_late_fusion_rgb,PPO,RGB,LateFusion,True,False,False
+../models/defend_the_center/q_cnn_rgb_best.pth,1004,5.025093169563795,1.176828201579936,4.953899122875525,5.098801723912181,q_cnn_rgb,Q-Learning,RGB,CNN,False,False,False
+../models/defend_the_center/q_rainbow_stacked_gray.pth,1004,5.020858336254895,1.9451736145279745,4.896457071394559,5.137370836414189,q_rainbow_stacked_gray,Q-Learning,Grayscale,Rainbow,True,False,False
+../models/defend_the_center/q_late_fusion_rgb_best.pth,1004,4.827245864260244,1.7394582517529813,4.719950199127197,4.932929901440305,q_late_fusion_rgb,Q-Learning,RGB,LateFusion,False,False,False
+../models/defend_the_center/q_late_fusion_gray_best.pth,1004,4.50542657106996,1.9650464915630454,4.3844001267060815,4.629877730058246,q_late_fusion_gray,Q-Learning,Grayscale,LateFusion,False,False,False
+../models/defend_the_center/q_cnn_gray_best.pth,1004,4.045127527766018,1.2738120992196362,3.9669083795788516,4.125377700127572,q_cnn_gray,Q-Learning,Grayscale,CNN,False,False,False
+../models/defend_the_center/q_rainbow_stacked_rgb.pth,1004,3.4135879272246266,1.8400130946167947,3.301196335609334,3.5268924302788847,q_rainbow_stacked_rgb,Q-Learning,RGB,Rainbow,True,False,False
+../models/defend_the_center/ppo_late_fusion_rgb_center.pth,1004,2.2792549255597163,1.1054126656036052,2.212512596245425,2.3491593627815703,ppo_late_fusion_rgb,PPO,RGB,LateFusion,False,False,False
+random,1004,1.2845947555208956,1.4681618037867175,1.1941254389665181,1.3776755668186842,random,Random,,Random,False,True,False
+../models/defend_the_center/ppo_cnn_rgb_center.pth,1004,-0.34027181218463587,0.7189057503003972,-0.38443971808658417,-0.2934518694699524,ppo_cnn_rgb,PPO,RGB,CNN,False,False,False
