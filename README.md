@@ -14,6 +14,15 @@ ViZDoom is based on [ZDoom](https://zdoom.org) engine to provide the game mechan
 
 This is a student project for CSC 480 at Cal Poly San Luis Obispo under Dr. Rodrigo Canaan (rcanaan@calpoly.edu).
 
+**Members**:
+
+- Sean Nguyen
+- Eric Lee
+- Jason Skeoch
+- Ryan Vo
+- Andrew Loader
+- Deja Dominguez
+
 To replicate this project locally, follow the steps below.
 
 ## Setting it up
